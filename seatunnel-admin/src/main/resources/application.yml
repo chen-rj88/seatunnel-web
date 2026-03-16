@@ -6,7 +6,7 @@ server:
 
 seatunnel:
   client:
-    base-url: http://192.168.1.115:8080
+    base-url: http://192.168.20.191:8080
     context-path:
     connect-timeout-ms: 2000
     read-timeout-ms: 10000
@@ -38,9 +38,9 @@ spring:
 
   datasource:
     cockpit:
-      jdbc-url: jdbc:mysql://192.168.1.113:3306/seatunnel_web?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8
+      jdbc-url: jdbc:mysql://42.51.37.64:3306/seatunnel_web?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8
       username: root
-      password: 123456
+      password: Chen612812.%
       driver-class-name: com.mysql.cj.jdbc.Driver
       maximum-pool-size: 20
       idle-timeout: 30000
