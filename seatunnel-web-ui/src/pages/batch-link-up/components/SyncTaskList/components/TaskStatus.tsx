@@ -85,24 +85,25 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ status, errorMessage }) => {
     }
   };
 
-  // 默认状态
   if (!config) {
     return (
-      <span style={{ color: "#999" }}>
-        <MacCommandOutlined style={{ marginRight: 6 }} />
-        <span style={{ fontWeight: 500 }}>NOT STARTED</span>
+      <span className="inline-flex items-center text-[#999]">
+        <MacCommandOutlined className="mr-1.5" />
+        <span className="font-medium">NOT STARTED</span>
       </span>
     );
   }
 
   const content = (
-    <span style={{ color: config.color }}>
-      <span style={{ marginRight: 6 }}>{config.icon}</span>
-      <span style={{ fontWeight: 500 }}>{config.text}</span>
+    <span
+      className="inline-flex items-center font-medium"
+      style={{ color: config.color }}
+    >
+      <span className="mr-1.5 inline-flex items-center">{config.icon}</span>
+      <span>{config.text}</span>
     </span>
   );
 
-  // 失败时才包 Popover
   if (status === "FAILED" && errorMessage) {
     const lines = errorMessage.split("\n");
 
@@ -130,100 +131,57 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ status, errorMessage }) => {
         <Popover
           placement="right"
           trigger="hover"
+          title={null}
+          overlayInnerStyle={{
+            padding: 0,
+            borderRadius: 14,
+            overflow: "hidden",
+            boxShadow: "0 18px 45px rgba(15, 23, 42, 0.18)",
+          }}
           content={
-            <div
-              style={{
-                maxWidth: "80vh",
-                height: "50vh",
-                overflow: "auto",
-                backgroundColor: "#0f172a",
-                padding: "12px",
-                fontFamily: "Menlo, Monaco, Consolas, monospace",
-                fontSize: 13,
-                lineHeight: 1.6,
-                borderRadius: 6,
-              }}
-            >
-              {lines.map((line, index) => (
-                <div
-                  key={index}
+            <div className="w-[520px] overflow-hidden rounded-[14px] border border-white/10 bg-[#0f172a] font-mono text-[13px] leading-[1.6]">
+              <div className="flex h-10 items-center justify-between border-b border-white/10 bg-white/[0.03] px-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className={[
+                    "inline-flex items-center justify-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-all duration-200",
+                    copied
+                      ? "border-[#86efac]/80 bg-[#f0fdf4] text-[#16a34a]"
+                      : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white",
+                  ].join(" ")}
                   style={{
-                    display: "flex",
-                    alignItems: "flex-start",
+                    animation: copied ? "copySuccessPop 0.28s ease" : "none",
                   }}
                 >
-                  <span
-                    style={{
-                      width: 40,
-                      textAlign: "right",
-                      paddingRight: 12,
-                      color: "#64748b",
-                      userSelect: "none",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {index + 1}
-                  </span>
-                  <span
-                    style={{
-                      color: "rgb(0, 255, 136)",
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                      flex: 1,
-                    }}
-                  >
-                    {line || " "}
-                  </span>
-                </div>
-              ))}
-            </div>
-          }
-          title={
-            <div
-              style={{
-                padding: "4px 12px",
-                fontSize: 15,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center" }}>
-                <CloseOutlined style={{ color: "#ff4d4f", marginRight: 6 }} />
-                <span>Error Message</span>
+                  {copied ? <CheckOutlined /> : <CopyOutlined />}
+                  <span>{copied ? "COPYED" : "COPY"}</span>
+                </button>
               </div>
 
-              <button
-                type="button"
-                onClick={handleCopy}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 6,
-                  minWidth: 76,
-                  padding: "4px 8px",
-                  fontSize: 12,
-                  color: copied ? "#16a34a" : "#475569",
-                  background: copied ? "#f0fdf4" : "#fff",
-                  border: `1px solid ${copied ? "#86efac" : "#d9d9d9"}`,
-                  borderRadius: 16,
-                  cursor: "pointer",
-                  transition: "all 0.25s ease",
-                  boxShadow: copied
-                    ? "0 0 0 2px rgba(34,197,94,0.08)"
-                    : "none",
-                  animation: copied ? "copySuccessPop 0.28s ease" : "none",
-                }}
-              >
-                {copied ? <CheckOutlined /> : <CopyOutlined />}
-                <span>{copied ? "已复制" : "复制"}</span>
-              </button>
+              <div className="max-h-[240px] min-h-[120px] overflow-auto px-3 py-3">
+                {lines.map((line, index) => (
+                  <div key={index} className="flex items-start">
+                    <span className="w-9 shrink-0 select-none pr-3 text-right text-[#64748b]">
+                      {index + 1}
+                    </span>
+
+                    <span className="flex-1 whitespace-pre-wrap break-words text-[rgb(0,255,136)]">
+                      {line || " "}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           }
         >
-          <span style={{ cursor: "pointer" }}>{content}</span>
+          <span className="cursor-pointer">{content}</span>
         </Popover>
       </>
     );
