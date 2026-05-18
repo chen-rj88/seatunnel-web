@@ -17,10 +17,12 @@ type ActionType =
   | "BOW"
   | "THANKS";
 
+type FocusedField = "userName" | "userPassword" | null;
+
 type LoginPanelProps = {
   onFire: (type: ActionType) => void;
   onPanelHoverChange?: (hovered: boolean) => void;
-  onFieldFocusChange?: (field: "userName" | "userPassword" | null) => void;
+  onFieldFocusChange?: (field: FocusedField) => void;
 };
 
 export default function LoginPanel({
@@ -39,6 +41,7 @@ export default function LoginPanel({
   const fireThrottled = (key: string, type: ActionType, gapMs = 900) => {
     const now = Date.now();
     const last = lastFireRef.current[key] || 0;
+
     if (now - last >= gapMs) {
       lastFireRef.current[key] = now;
       onFire(type);
@@ -47,6 +50,7 @@ export default function LoginPanel({
 
   const fetchUserInfo = async () => {
     const userInfo = await initialState?.fetchUserInfo?.();
+
     if (userInfo) {
       flushSync(() => {
         setInitialState((s: any) => ({
@@ -80,14 +84,16 @@ export default function LoginPanel({
           })
         );
 
+        onFieldFocusChange?.(null);
         onFire("THANKS");
+
         await fetchUserInfo();
         redirectToHome();
+
         return;
       }
 
       onFire("TILT");
-      // message.error(data?.message || "Login failed");
     } catch (error) {
       onFire("SHAKE");
     } finally {
@@ -96,7 +102,9 @@ export default function LoginPanel({
   };
 
   const handleGoogleSuccess = async () => {
+    onFieldFocusChange?.(null);
     onFire("THANKS");
+
     await fetchUserInfo();
     redirectToHome();
   };
@@ -137,6 +145,7 @@ export default function LoginPanel({
           >
             Welcome back!
           </h1>
+
           <p
             style={{
               marginTop: 10,
@@ -182,7 +191,9 @@ export default function LoginPanel({
                 onFieldFocusChange?.("userName");
                 fireThrottled("focus_user", "SURPRISE", 1200);
               }}
-              onBlur={() => onFieldFocusChange?.(null)}
+              onBlur={() => {
+                onFieldFocusChange?.(null);
+              }}
             />
           </Form.Item>
 
@@ -201,7 +212,12 @@ export default function LoginPanel({
             }
             name="userPassword"
             style={{ marginBottom: 14 }}
-            rules={[{ required: true, message: "Please enter your password" }]}
+            rules={[
+              {
+                required: true,
+                message: "Please enter your password",
+              },
+            ]}
           >
             <Input.Password
               className="login-password-input"
@@ -212,7 +228,9 @@ export default function LoginPanel({
                 onFieldFocusChange?.("userPassword");
                 fireThrottled("focus_pwd", "BLINK", 1200);
               }}
-              onBlur={() => onFieldFocusChange?.(null)}
+              onBlur={() => {
+                onFieldFocusChange?.(null);
+              }}
             />
           </Form.Item>
 
@@ -240,6 +258,7 @@ export default function LoginPanel({
             type="default"
             htmlType="submit"
             loading={loading}
+            onMouseEnter={() => fireThrottled("login_hover", "SMILE", 900)}
           >
             <span className="default-layer">Log in</span>
 
@@ -255,9 +274,13 @@ export default function LoginPanel({
             className="animated-profile-btn-v2"
             style={{ marginTop: 14 }}
             loading={loading}
-            onStart={() => setLoading(true)}
+            onStart={() => {
+              onFieldFocusChange?.(null);
+              setLoading(true);
+            }}
             onSuccess={handleGoogleSuccess}
             onError={() => {
+              onFieldFocusChange?.(null);
               onFire("SHAKE");
               setLoading(false);
             }}
@@ -272,7 +295,11 @@ export default function LoginPanel({
             }}
           >
             Don&apos;t have an account?{" "}
-            <Button type="link" style={{ padding: 0, fontWeight: 600 }}>
+            <Button
+              type="link"
+              style={{ padding: 0, fontWeight: 600 }}
+              onMouseEnter={() => fireThrottled("signup_hover", "TILT", 900)}
+            >
               Sign Up
             </Button>
           </div>

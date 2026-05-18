@@ -19,6 +19,7 @@ const BASE_LAYOUT = {
 
 /** ===================== Types ===================== */
 type Pt = { x: number; y: number };
+
 type ActionType =
   | "BLINK"
   | "SMILE"
@@ -27,10 +28,12 @@ type ActionType =
   | "SHAKE"
   | "BOW"
   | "THANKS";
+
 type GlobalAction = { type: ActionType; nonce: number };
 type Expression = "idle" | "smile" | "surprise";
 type Variant = "orange" | "blue" | "black" | "yellow";
 type EntryMode = "bottomBounce" | "topDrop" | "sideSlide";
+type FocusedField = "userName" | "userPassword" | null;
 
 type CharacterSpec = {
   w: number;
@@ -156,6 +159,7 @@ function bounceOut(t: number) {
   let x = clamp(t, 0, 1);
   const n1 = 7.5625;
   const d1 = 2.75;
+
   if (x < 1 / d1) return n1 * x * x;
   if (x < 2 / d1) return n1 * (x -= 1.5 / d1) * x + 0.75;
   if (x < 2.5 / d1) return n1 * (x -= 2.25 / d1) * x + 0.9375;
@@ -168,29 +172,39 @@ function vecToPupilOffset(from: Pt, to: Pt, maxR: number) {
   const len = Math.hypot(dx, dy) || 1;
   const ux = dx / len;
   const uy = dy / len;
+
   return { x: ux * maxR, y: uy * maxR };
 }
 
 function getCenter(el: HTMLElement | null): Pt | null {
   if (!el) return null;
+
   const r = el.getBoundingClientRect();
-  return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+
+  return {
+    x: r.left + r.width / 2,
+    y: r.top + r.height / 2,
+  };
 }
 
 function hash01(nonce: number, key: string) {
   let h = 2166136261;
   const s = `${nonce}:${key}`;
-  for (let i = 0; i < s.length; i++) {
+
+  for (let i = 0; i < s.length; i += 1) {
     h ^= s.charCodeAt(i);
     h = Math.imul(h, 16777619);
   }
+
   return ((h >>> 0) % 1000) / 1000;
 }
 
 function getResponsiveScale(stageW: number, stageH: number) {
   if (!stageW || !stageH) return 1;
+
   const scaleX = stageW / 1100;
   const scaleY = stageH / 760;
+
   return clamp(Math.min(scaleX, scaleY), 0.58, 1.42);
 }
 
@@ -222,6 +236,7 @@ function getScaledSpecs(scale: number): Record<Variant, CharacterSpec> {
 
 function getScaledLayout(scale: number) {
   const px = (n: number) => Math.round(n * scale);
+
   return {
     absLeft: {
       orange: px(BASE_LAYOUT.absLeft.orange),
@@ -296,6 +311,8 @@ function Character(props: {
   bootT: number;
   stageRect: { left: number; top: number; width: number; height: number };
   sceneLookMode: "track" | "peekRight";
+  focusedField?: FocusedField;
+  focusPeek?: boolean;
   style?: CSSProperties;
 }) {
   const {
@@ -308,6 +325,8 @@ function Character(props: {
     bootT,
     stageRect,
     sceneLookMode,
+    focusedField,
+    focusPeek = false,
     style,
   } = props;
 
@@ -350,6 +369,7 @@ function Character(props: {
 
     const ro = new ResizeObserver(update);
     if (bodyRef.current) ro.observe(bodyRef.current);
+
     window.addEventListener("resize", update);
 
     return () => {
@@ -360,14 +380,22 @@ function Character(props: {
 
   /** ===== Decide target look point ===== */
   const lookTarget = useMemo(() => {
-    if (sceneLookMode === "peekRight") {
+    if (focusPeek && variant === "blue") {
       return {
-        x: stageRect.left + stageRect.width + 160,
-        y: stageRect.top + stageRect.height * 0.45,
+        x: stageRect.left + stageRect.width + 320,
+        y: stageRect.top + stageRect.height * 0.26,
       };
     }
+
+    if (sceneLookMode === "peekRight") {
+      return {
+        x: stageRect.left + stageRect.width + 180,
+        y: stageRect.top + stageRect.height * 0.42,
+      };
+    }
+
     return mouse;
-  }, [mouse, sceneLookMode, stageRect]);
+  }, [focusPeek, mouse, sceneLookMode, stageRect, variant]);
 
   /** ===== Update pupil target ===== */
   useEffect(() => {
@@ -377,6 +405,7 @@ function Character(props: {
     const left = cL
       ? vecToPupilOffset(cL, lookTarget, spec.pupilMaxR)
       : { x: 0, y: 0 };
+
     const right = cR
       ? vecToPupilOffset(cR, lookTarget, spec.pupilMaxR)
       : { x: 0, y: 0 };
@@ -411,6 +440,7 @@ function Character(props: {
     };
 
     raf = requestAnimationFrame(tick);
+
     return () => cancelAnimationFrame(raf);
   }, []);
 
@@ -422,11 +452,15 @@ function Character(props: {
 
     const loop = () => {
       const wait = 2400 + Math.random() * 2800;
+
       blinkTimer = window.setTimeout(() => {
         if (disposed) return;
+
         setBlink(true);
+
         reopenTimer = window.setTimeout(() => {
           if (disposed) return;
+
           setBlink(false);
           loop();
         }, 120 + Math.random() * 50);
@@ -465,6 +499,7 @@ function Character(props: {
 
   /** ===== Mouse-based face parallax / body lean ===== */
   const bodyCenter = bodyCenterRef.current;
+
   let faceShiftX = 0;
   let faceShiftY = 0;
   let mouseLean = 0;
@@ -490,9 +525,28 @@ function Character(props: {
         : 820)) %
       2200) /
     2200;
+
   const breathe = Math.sin(idlePhase * Math.PI * 2);
   const breatheY = breathe * 2.8 * scale;
   const breatheScaleY = 1 + breathe * 0.01;
+
+  /** ===== Focus peek animation for blue character ===== */
+  const shouldFocusPeek = focusPeek && variant === "blue";
+
+  const peekLift = 0;
+
+  // 身体往右“撑开/探头”，不要整体抬起来
+  const peekSkew = shouldFocusPeek ? -7 : 0;
+
+  // rotate 会让底部一边翘起来，所以这里一定要小
+  const peekRotate = shouldFocusPeek ? 1.2 : 0;
+
+  // 高度变高，但脚底不动，因为 transformOrigin 是 50% 100%
+  const peekScaleY = shouldFocusPeek ? 1.12 : 1;
+  const peekScaleX = shouldFocusPeek ? 1.08 : 1;
+
+  // 只让脸稍微往上走，不要让身体离地
+  const peekFaceLift = shouldFocusPeek ? -10 * scale : 0;
 
   /** ===== Actions ===== */
   const doBlink = () =>
@@ -518,6 +572,26 @@ function Character(props: {
       );
     });
 
+  useEffect(() => {
+    if (variant !== "blue") return;
+
+    clearTimers();
+
+    if (focusedField === "userName") {
+      setExpression("surprise");
+      setBlink(false);
+      return;
+    }
+
+    if (focusedField === "userPassword") {
+      setExpression("smile");
+      setBlink(false);
+      return;
+    }
+
+    setExpression("idle");
+  }, [focusedField, variant]);
+
   const doTilt = (amp: number) =>
     runAction(() => {
       setTilt(-10 * spec.tiltMul * amp);
@@ -533,6 +607,7 @@ function Character(props: {
   const doShakeHead = (amp: number) =>
     runAction(() => {
       const A = 12 * spec.shakeMul * amp;
+
       setTilt(-A);
       timersRef.current.push(window.setTimeout(() => setTilt(A), 120));
       timersRef.current.push(window.setTimeout(() => setTilt(-A * 0.85), 240));
@@ -543,6 +618,7 @@ function Character(props: {
   const doBow = (amp: number) =>
     runAction(() => {
       const B = 1 * spec.bowMul * amp;
+
       setBow(B);
       timersRef.current.push(window.setTimeout(() => setBow(B * 0.6), 120));
       timersRef.current.push(window.setTimeout(() => setBow(B * 0.9), 240));
@@ -590,6 +666,8 @@ function Character(props: {
         case "THANKS":
           doThanks(amp);
           break;
+        default:
+          break;
       }
     }, delay);
 
@@ -605,11 +683,13 @@ function Character(props: {
 
   const bodyTransform = `
     translateX(${enterX}px)
-    translateY(${enterY + breatheY}px)
+    translateY(${enterY + breatheY + peekLift}px)
     scale(${enterScale})
-    rotate(${global + mouseLean * 0.25 + tilt}deg)
+    rotate(${global + mouseLean * 0.25 + tilt + peekRotate}deg)
+    skewX(${peekSkew}deg)
     translateY(${bow * 10 * scale}px)
-    scaleY(${(1 - bow * 0.06) * breatheScaleY})
+    scaleX(${peekScaleX})
+    scaleY(${(1 - bow * 0.06) * breatheScaleY * peekScaleY})
   `;
 
   const eyeStyle: React.CSSProperties = {
@@ -645,7 +725,7 @@ function Character(props: {
         <div
           style={{
             position: "absolute",
-            top: spec.mouthTop + faceShiftY * 0.25,
+            top: spec.mouthTop + faceShiftY * 0.25 + peekFaceLift,
             left: "50%",
             transform: `translateX(calc(-50% + ${faceShiftX * 0.2}px))`,
             width: Math.max(8, Math.round(10 * scale)),
@@ -663,7 +743,7 @@ function Character(props: {
         <div
           style={{
             position: "absolute",
-            top: spec.mouthTop + faceShiftY * 0.2,
+            top: spec.mouthTop + faceShiftY * 0.2 + peekFaceLift,
             left: "50%",
             transform: `translateX(calc(-50% + ${faceShiftX * 0.18}px))`,
             width: Math.max(16, Math.round(22 * scale)),
@@ -688,7 +768,7 @@ function Character(props: {
       <div
         style={{
           position: "absolute",
-          top: spec.mouthTop + faceShiftY * 0.18,
+          top: spec.mouthTop + faceShiftY * 0.18 + peekFaceLift,
           left: "50%",
           transform: `translateX(calc(-50% + ${faceShiftX * 0.15}px))`,
           width: Math.max(14, Math.round(18 * scale)),
@@ -703,7 +783,7 @@ function Character(props: {
 
   const faceLayer: CSSProperties = {
     position: "absolute",
-    top: spec.faceTop + faceShiftY,
+    top: spec.faceTop + faceShiftY + peekFaceLift,
     left: 0,
     right: 0,
     display: "flex",
@@ -711,11 +791,15 @@ function Character(props: {
     gap: spec.eyeGap,
     pointerEvents: "none",
     transform: `translateX(${faceShiftX}px)`,
-    transition: "transform 120ms linear, top 120ms linear",
+    transition:
+      "transform 160ms linear, top 220ms cubic-bezier(0.16, 1, 0.3, 1)",
   };
 
-  const transition = "transform 420ms cubic-bezier(0.22, 1.4, 0.36, 1)";
+  const transition =
+    "transform 620ms cubic-bezier(0.16, 1, 0.3, 1), border-radius 420ms ease";
+
   const shadowBlur = Math.max(10, Math.round(18 * scale));
+  const transformOrigin = shouldFocusPeek ? "50% 100%" : "50% 85%";
 
   if (spec.shape === "semiTop") {
     const wrap: CSSProperties = {
@@ -725,7 +809,7 @@ function Character(props: {
       overflow: "hidden",
       borderRadius: Math.max(10, Math.round(12 * scale)),
       transform: bodyTransform,
-      transformOrigin: "50% 85%",
+      transformOrigin,
       transition,
       ...(style || {}),
     };
@@ -746,6 +830,7 @@ function Character(props: {
     return (
       <div ref={bodyRef} style={wrap}>
         <div style={circle} />
+
         <div style={faceLayer}>
           <div ref={eyeLeftRef} style={eyeStyle}>
             <div
@@ -755,6 +840,7 @@ function Character(props: {
               }}
             />
           </div>
+
           <div ref={eyeRightRef} style={eyeStyle}>
             <div
               style={{
@@ -764,6 +850,7 @@ function Character(props: {
             />
           </div>
         </div>
+
         {mouthNode}
       </div>
     );
@@ -777,8 +864,9 @@ function Character(props: {
     position: "relative",
     boxShadow: `0 ${Math.round(10 * scale)}px ${shadowBlur}px rgba(0,0,0,0.10)`,
     transform: bodyTransform,
-    transformOrigin: "50% 85%",
+    transformOrigin,
     transition,
+    willChange: "transform",
     ...(style || {}),
   };
 
@@ -793,6 +881,7 @@ function Character(props: {
             }}
           />
         </div>
+
         <div ref={eyeRightRef} style={eyeStyle}>
           <div
             style={{
@@ -802,6 +891,7 @@ function Character(props: {
           />
         </div>
       </div>
+
       {mouthNode}
     </div>
   );
@@ -818,178 +908,188 @@ const CharactersScene = forwardRef<
     stageW: number;
     stageH: number;
     stageRect: { left: number; top: number; width: number; height: number };
+    focusedField: FocusedField;
   }
->(({ mouse, action, globalTilt, bootT, stageW, stageH, stageRect }, ref) => {
-  const responsiveScale = useMemo(
-    () => getResponsiveScale(stageW, stageH),
-    [stageW, stageH]
-  );
+>(
+  (
+    {
+      mouse,
+      action,
+      globalTilt,
+      bootT,
+      stageW,
+      stageH,
+      stageRect,
+      focusedField,
+    },
+    ref
+  ) => {
+    const responsiveScale = useMemo(
+      () => getResponsiveScale(stageW, stageH),
+      [stageW, stageH]
+    );
 
-  const specs = useMemo(
-    () => getScaledSpecs(responsiveScale),
-    [responsiveScale]
-  );
+    const specs = useMemo(
+      () => getScaledSpecs(responsiveScale),
+      [responsiveScale]
+    );
 
-  const layout = useMemo(
-    () => getScaledLayout(responsiveScale),
-    [responsiveScale]
-  );
+    const layout = useMemo(
+      () => getScaledLayout(responsiveScale),
+      [responsiveScale]
+    );
 
-  const { relLeft, groupW, relBottom, groupH } = useMemo(
-    () => computeLayout(layout, specs),
-    [layout, specs]
-  );
+    const { relLeft, groupW, relBottom, groupH } = useMemo(
+      () => computeLayout(layout, specs),
+      [layout, specs]
+    );
 
-  const baseLeft = Math.max(0, (stageW - groupW) / 2);
-  // const baseBottom = Math.max(0, (stageH - groupH) / 2);
-  const baseBottom = Math.max(0, (stageH - groupH) / 2 - stageH * 0.1);
+    const baseLeft = Math.max(0, (stageW - groupW) / 2);
+    const baseBottom = Math.max(0, (stageH - groupH) / 2 - stageH * 0.1);
 
-  const sceneLookMode: "track" | "peekRight" = useMemo(() => {
-    const stageRight = stageRect.left + stageRect.width;
-    const nearFormArea = mouse.x > stageRight - 30;
-    return nearFormArea ? "peekRight" : "track";
-  }, [mouse.x, stageRect]);
+    const sceneLookMode: "track" | "peekRight" = useMemo(() => {
+      if (focusedField) return "peekRight";
 
-  return (
-    <div
-      ref={ref}
-      style={{
-        width: "100%",
-        height: "100vh",
-        // background:
-        //   "radial-gradient(circle at 30% 20%, #ffffff 0%, #f8f8fb 38%, #f3f4f8 100%)",
-        background: `
-  radial-gradient(circle at 18% 16%, rgba(90, 151, 200, 0.10) 0%, rgba(90, 151, 200, 0.05) 20%, rgba(90, 151, 200, 0) 42%),
-  radial-gradient(circle at 78% 12%, rgba(87, 169, 200, 0.08) 0%, rgba(87, 169, 200, 0.03) 18%, rgba(87, 169, 200, 0) 36%),
-  linear-gradient(180deg, #F8FAFC 0%, #F2F6FA 100%)
-`,
-        backdropFilter: "blur(24px)",
-        WebkitBackdropFilter: "blur(24px)",
-        border: "1px solid rgba(255,255,255,0.58)",
-        boxShadow: `
-    0 18px 50px rgba(15, 23, 42, 0.08),
-    inset 0 1px 0 rgba(255,255,255,0.6)
-  `,
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
+      const stageRight = stageRect.left + stageRect.width;
+      const nearFormArea = mouse.x > stageRight - 30;
+
+      return nearFormArea ? "peekRight" : "track";
+    }, [focusedField, mouse.x, stageRect]);
+
+    const blueFocusPeek = !!focusedField;
+
+    return (
       <div
+        ref={ref}
         style={{
-          position: "absolute",
-          inset: 0,
-          // background:
-          //   "linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 28%)",
-          pointerEvents: "none",
+          width: "100%",
+          height: "100vh",
+          background: `
+            radial-gradient(circle at 18% 16%, rgba(90, 151, 200, 0.10) 0%, rgba(90, 151, 200, 0.05) 20%, rgba(90, 151, 200, 0) 42%),
+            radial-gradient(circle at 78% 12%, rgba(87, 169, 200, 0.08) 0%, rgba(87, 169, 200, 0.03) 18%, rgba(87, 169, 200, 0) 36%),
+            linear-gradient(180deg, #F8FAFC 0%, #F2F6FA 100%)
+          `,
+          backdropFilter: "blur(24px)",
+          WebkitBackdropFilter: "blur(24px)",
+          border: "1px solid rgba(255,255,255,0.58)",
+          boxShadow: `
+            0 18px 50px rgba(15, 23, 42, 0.08),
+            inset 0 1px 0 rgba(255,255,255,0.6)
+          `,
+          position: "relative",
+          overflow: "hidden",
         }}
-      />
+      >
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            pointerEvents: "none",
+          }}
+        />
 
-      {/* 顶部轻雾高光 */}
-      <div className="scene-overlay scene-overlay-top" />
+        <div className="scene-overlay scene-overlay-top" />
+        <div className="scene-overlay scene-overlay-floor" />
 
-      {/* 底部舞台光 */}
-      <div className="scene-overlay scene-overlay-floor" />
+        <div className="scene-glow scene-glow-left" />
+        <div className="scene-glow scene-glow-right" />
 
-      {/* 左上角柔光团 */}
-      <div className="scene-glow scene-glow-left" />
+        <div className="scene-bubbles">
+          <span className="bubble bubble-1" />
+          <span className="bubble bubble-2" />
+          <span className="bubble bubble-3" />
+          <span className="bubble bubble-4" />
+          <span className="bubble bubble-5" />
+          <span className="bubble bubble-6" />
+          <span className="bubble bubble-7" />
+        </div>
 
-      {/* 右上角柔光团 */}
-      <div className="scene-glow scene-glow-right" />
+        <div className="scene-sparkles">
+          <span className="spark spark-1" />
+          <span className="spark spark-2" />
+          <span className="spark spark-3" />
+          <span className="spark spark-4" />
+        </div>
 
-      <div className="scene-bubbles">
-        <span className="bubble bubble-1" />
-        <span className="bubble bubble-2" />
-        <span className="bubble bubble-3" />
-        <span className="bubble bubble-4" />
-        <span className="bubble bubble-5" />
-        <span className="bubble bubble-6" />
-        <span className="bubble bubble-7" />
-      </div>
-
-      <div className="scene-sparkles">
-        <span className="spark spark-1" />
-        <span className="spark spark-2" />
-        <span className="spark spark-3" />
-        <span className="spark spark-4" />
-      </div>
-   
         <SceneCopy />
-     
 
-      <Character
-        variant="orange"
-        spec={specs.orange}
-        scale={responsiveScale}
-        mouse={mouse}
-        action={action}
-        globalTilt={globalTilt}
-        bootT={bootT}
-        stageRect={stageRect}
-        sceneLookMode={sceneLookMode}
-        style={{
-          position: "absolute",
-          left: baseLeft + relLeft.orange,
-          bottom: baseBottom + relBottom.orange,
-          zIndex: 30,
-        }}
-      />
+        <Character
+          variant="orange"
+          spec={specs.orange}
+          scale={responsiveScale}
+          mouse={mouse}
+          action={action}
+          globalTilt={globalTilt}
+          bootT={bootT}
+          stageRect={stageRect}
+          sceneLookMode={sceneLookMode}
+          style={{
+            position: "absolute",
+            left: baseLeft + relLeft.orange,
+            bottom: baseBottom + relBottom.orange,
+            zIndex: 30,
+          }}
+        />
 
-      <Character
-        variant="blue"
-        spec={specs.blue}
-        scale={responsiveScale}
-        mouse={mouse}
-        action={action}
-        globalTilt={globalTilt}
-        bootT={bootT}
-        stageRect={stageRect}
-        sceneLookMode={sceneLookMode}
-        style={{
-          position: "absolute",
-          left: baseLeft + relLeft.blue,
-          bottom: baseBottom + relBottom.blue,
-          zIndex: 10,
-        }}
-      />
+        <Character
+          variant="blue"
+          spec={specs.blue}
+          scale={responsiveScale}
+          mouse={mouse}
+          action={action}
+          globalTilt={globalTilt}
+          bootT={bootT}
+          stageRect={stageRect}
+          sceneLookMode={sceneLookMode}
+          focusedField={focusedField}
+          focusPeek={blueFocusPeek}
+          style={{
+            position: "absolute",
+            left: baseLeft + relLeft.blue,
+            bottom: baseBottom + relBottom.blue,
+            zIndex: 10,
+          }}
+        />
 
-      <Character
-        variant="black"
-        spec={specs.black}
-        scale={responsiveScale}
-        mouse={mouse}
-        action={action}
-        globalTilt={globalTilt}
-        bootT={bootT}
-        stageRect={stageRect}
-        sceneLookMode={sceneLookMode}
-        style={{
-          position: "absolute",
-          left: baseLeft + relLeft.black,
-          bottom: baseBottom + relBottom.black,
-          zIndex: 12,
-        }}
-      />
+        <Character
+          variant="black"
+          spec={specs.black}
+          scale={responsiveScale}
+          mouse={mouse}
+          action={action}
+          globalTilt={globalTilt}
+          bootT={bootT}
+          stageRect={stageRect}
+          sceneLookMode={sceneLookMode}
+          style={{
+            position: "absolute",
+            left: baseLeft + relLeft.black,
+            bottom: baseBottom + relBottom.black,
+            zIndex: 12,
+          }}
+        />
 
-      <Character
-        variant="yellow"
-        spec={specs.yellow}
-        scale={responsiveScale}
-        mouse={mouse}
-        action={action}
-        globalTilt={globalTilt}
-        bootT={bootT}
-        stageRect={stageRect}
-        sceneLookMode={sceneLookMode}
-        style={{
-          position: "absolute",
-          left: baseLeft + relLeft.yellow,
-          bottom: baseBottom + relBottom.yellow,
-          zIndex: 11,
-        }}
-      />
-    </div>
-  );
-});
+        <Character
+          variant="yellow"
+          spec={specs.yellow}
+          scale={responsiveScale}
+          mouse={mouse}
+          action={action}
+          globalTilt={globalTilt}
+          bootT={bootT}
+          stageRect={stageRect}
+          sceneLookMode={sceneLookMode}
+          style={{
+            position: "absolute",
+            left: baseLeft + relLeft.yellow,
+            bottom: baseBottom + relBottom.yellow,
+            zIndex: 11,
+          }}
+        />
+      </div>
+    );
+  }
+);
 
 CharactersScene.displayName = "CharactersScene";
 
@@ -1012,6 +1112,8 @@ export default function BlueCrewDemo() {
     height: 0,
   });
 
+  const [focusedField, setFocusedField] = useState<FocusedField>(null);
+
   const bootStartRef = useRef<number>(0);
   const mouseTargetRef = useRef<Pt>({ x: 0, y: 0 });
   const tiltTargetRef = useRef(0);
@@ -1028,6 +1130,7 @@ export default function BlueCrewDemo() {
     };
 
     raf = requestAnimationFrame(tick);
+
     return () => cancelAnimationFrame(raf);
   }, []);
 
@@ -1041,12 +1144,14 @@ export default function BlueCrewDemo() {
 
       const cx = r.left + r.width / 2;
       const dx = (e.clientX - cx) / (r.width / 2);
+
       tiltTargetRef.current = clamp(dx, -1, 1) * 6;
     };
 
     window.addEventListener("mousemove", onMove, { passive: true });
 
     let raf = 0;
+
     const animate = () => {
       setMouse((prev) => ({
         x: lerp(prev.x, mouseTargetRef.current.x, 0.22),
@@ -1073,6 +1178,7 @@ export default function BlueCrewDemo() {
 
     const update = () => {
       const r = el.getBoundingClientRect();
+
       setStageRect({
         left: r.left,
         top: r.top,
@@ -1095,7 +1201,9 @@ export default function BlueCrewDemo() {
     };
   }, []);
 
-  const fire = (type: ActionType) => setAction({ type, nonce: Date.now() });
+  const fire = (type: ActionType) => {
+    setAction({ type, nonce: Date.now() });
+  };
 
   return (
     <div style={{ position: "relative", height: "100vh" }}>
@@ -1118,6 +1226,7 @@ export default function BlueCrewDemo() {
               stageW={stageRect.width}
               stageH={stageRect.height}
               stageRect={stageRect}
+              focusedField={focusedField}
             />
           </Col>
 
@@ -1134,7 +1243,7 @@ export default function BlueCrewDemo() {
               padding: 0,
             }}
           >
-            <LoginPanel onFire={fire} />
+            <LoginPanel onFire={fire} onFieldFocusChange={setFocusedField} />
           </Col>
         </Row>
       </div>
