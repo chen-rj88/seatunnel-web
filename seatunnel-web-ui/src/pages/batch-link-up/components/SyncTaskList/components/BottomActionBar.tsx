@@ -13,6 +13,7 @@ interface BottomActionBarProps {
     pageSize?: number;
     onChange?: (page: number, pageSize: number) => void;
   };
+  selectedCount?: number;
   disabled?: boolean;
 }
 
@@ -20,6 +21,7 @@ const BottomActionBar: React.FC<BottomActionBarProps> = ({
   onStart,
   onStop,
   pagination,
+  selectedCount = 0,
   disabled = false,
 }) => {
   const intl = useIntl();
@@ -43,6 +45,7 @@ const BottomActionBar: React.FC<BottomActionBarProps> = ({
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          gap: 16,
         }}
       >
         <div style={{ display: "flex", alignItems: "center" }}>
@@ -51,7 +54,7 @@ const BottomActionBar: React.FC<BottomActionBarProps> = ({
             type="primary"
             onClick={onStart}
             disabled={disabled}
-            className="h-8 min-w-[88px] rounded-full border-none bg-gradient-to-rfont-bold shadow-[0_12px_26px_rgba(53,84,209,0.23)]"
+            className="h-8 min-w-[88px] rounded-full border-none font-bold shadow-[0_12px_26px_rgba(53,84,209,0.23)]"
             icon={<PlayCircleOutlined />}
           >
             {intl.formatMessage({
@@ -68,7 +71,7 @@ const BottomActionBar: React.FC<BottomActionBarProps> = ({
             danger
             type="primary"
             disabled={disabled}
-            className="h-8 min-w-[88px] rounded-full border-none bg-gradient-to-rfont-bold shadow-[0_12px_26px_rgba(53,84,209,0.23)]"
+            className="h-8 min-w-[88px] rounded-full border-none font-bold shadow-[0_12px_26px_rgba(244,63,94,0.18)]"
             icon={<StopOutlined />}
           >
             {intl.formatMessage({
@@ -76,10 +79,29 @@ const BottomActionBar: React.FC<BottomActionBarProps> = ({
               defaultMessage: "Stop",
             })}
           </Button>
+
+          {selectedCount > 0 ? (
+            <>
+              <Divider type="vertical" />
+
+              <span className="text-xs text-slate-500">
+                已选择{" "}
+                <span className="font-semibold text-slate-900">
+                  {selectedCount}
+                </span>{" "}
+                条
+              </span>
+            </>
+          ) : null}
         </div>
 
         <div style={{ marginRight: 8 }}>
-          <CustomPagination {...pagination} />
+          <CustomPagination
+            total={pagination.total}
+            current={pagination.current}
+            pageSize={pagination.pageSize}
+            onChange={pagination.onChange}
+          />
         </div>
       </div>
     </div>
