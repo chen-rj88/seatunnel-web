@@ -1,19 +1,24 @@
 import { Divider, message, Modal } from "antd";
+import moment from "moment";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { history } from "umi";
 
+import {
+  seatunnelStreamingJobExecuteApi,
+  seatunnelStremJobDefinitionApi,
+} from "./api";
 import BottomActionBar from "./components/BottomActionBar";
 import RealtimeHeader from "./components/RealtimeHeader";
 import RealtimeTaskTable from "./components/RealtimeTaskTable";
 import SearchToolbar from "./components/SearchToolbar";
 import StreamingHelperSection from "./components/StreamingHelperSection";
-import {
-  seatunnelJobExecuteApi,
-  seatunnelStreamingJobExecuteApi,
-  seatunnelStremJobDefinitionApi,
-} from "./api";
 
 const REALTIME_DETAIL_CACHE_PREFIX = "stream-link-up-detail";
+
+const DEFAULT_TIME_RANGE = [
+  moment().subtract(4, "days"),
+  moment().add(1, "days"),
+];
 
 interface StreamingJobDefinitionVO {
   id: string | number;
@@ -37,6 +42,116 @@ interface StreamingJobDefinitionVO {
   checkpointConfig?: string;
 }
 
+interface SearchValues {
+  jobName?: string;
+  id?: string | number;
+  status?: string;
+  sourceType?: string;
+  sinkType?: string;
+  sourceTable?: string;
+  sinkTable?: string;
+  createTime?: any[];
+}
+
+interface PaginationState {
+  current: number;
+  pageSize: number;
+  total: number;
+}
+
+const parseSearchParamsFromUrl = (): SearchValues => {
+  const params = new URLSearchParams(window.location.search);
+
+  const createTimeStart = params.get("createTimeStart");
+  const createTimeEnd = params.get("createTimeEnd");
+
+  return {
+    jobName: params.get("jobName") || undefined,
+    id: params.get("id") || undefined,
+    status: params.get("status") || undefined,
+    sourceType: params.get("sourceType") || undefined,
+    sinkType: params.get("sinkType") || undefined,
+    sourceTable: params.get("sourceTable") || undefined,
+    sinkTable: params.get("sinkTable") || undefined,
+    createTime:
+      createTimeStart && createTimeEnd
+        ? [
+            moment(createTimeStart, "YYYY-MM-DD HH:mm:ss"),
+            moment(createTimeEnd, "YYYY-MM-DD HH:mm:ss"),
+          ]
+        : DEFAULT_TIME_RANGE,
+  };
+};
+
+const parsePaginationFromUrl = (): PaginationState => {
+  const params = new URLSearchParams(window.location.search);
+
+  const current = Number(params.get("current") || 1);
+  const pageSize = Number(params.get("pageSize") || 10);
+
+  return {
+    current: Number.isNaN(current) || current <= 0 ? 1 : current,
+    pageSize: Number.isNaN(pageSize) || pageSize <= 0 ? 10 : pageSize,
+    total: 0,
+  };
+};
+
+const syncUrlParams = (
+  params: SearchValues,
+  pageInfo: {
+    current: number;
+    pageSize: number;
+  }
+) => {
+  const query = new URLSearchParams();
+
+  if (params?.jobName) {
+    query.set("jobName", String(params.jobName));
+  }
+
+  if (params?.id) {
+    query.set("id", String(params.id));
+  }
+
+  if (params?.status) {
+    query.set("status", params.status);
+  }
+
+  if (params?.sourceType) {
+    query.set("sourceType", params.sourceType);
+  }
+
+  if (params?.sinkType) {
+    query.set("sinkType", params.sinkType);
+  }
+
+  if (params?.sourceTable) {
+    query.set("sourceTable", params.sourceTable);
+  }
+
+  if (params?.sinkTable) {
+    query.set("sinkTable", params.sinkTable);
+  }
+
+  if (params?.createTime?.length === 2) {
+    query.set(
+      "createTimeStart",
+      moment(params.createTime[0]).format("YYYY-MM-DD HH:mm:ss")
+    );
+    query.set(
+      "createTimeEnd",
+      moment(params.createTime[1]).format("YYYY-MM-DD HH:mm:ss")
+    );
+  }
+
+  query.set("current", String(pageInfo.current || 1));
+  query.set("pageSize", String(pageInfo.pageSize || 10));
+
+  history.replace({
+    search: `?${query.toString()}`,
+  });
+};
+
 const RealtimeSyncPage: React.FC = () => {
   const [sourceType, setSourceType] = useState<any>({
     dbType: "MYSQL",
@@ -50,10 +165,13 @@ const RealtimeSyncPage: React.FC = () => {
     pluginName: "JDBC-MYSQL",
   });
 
-  const [keyword, setKeyword] = useState("");
-  const [releaseState, setReleaseState] = useState<string>();
-  const [sourceQueryType, setSourceQueryType] = useState<string>();
-  const [sinkQueryType, setSinkQueryType] = useState<string>();
+  const [searchValues, setSearchValues] = useState<SearchValues>(() =>
+    parseSearchParamsFromUrl()
+  );
+
+  const [pagination, setPagination] = useState<PaginationState>(() =>
+    parsePaginationFromUrl()
+  );
 
   const [dataSource, setDataSource] = useState<StreamingJobDefinitionVO[]>([]);
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([]);
@@ -61,36 +179,62 @@ const RealtimeSyncPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
 
-  const [current, setCurrent] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [total, setTotal] = useState(0);
-
   const hasSelected = selectedRowKeys.length > 0;
 
   const queryParams = useMemo(() => {
     const params: any = {
-      pageNo: current,
-      pageSize,
+      pageNo: pagination.current,
+      pageSize: pagination.pageSize,
     };
 
-    if (keyword?.trim()) {
-      params.jobName = keyword.trim();
+    if (searchValues?.jobName?.trim()) {
+      params.jobName = searchValues.jobName.trim();
     }
 
-    if (releaseState) {
-      params.releaseState = releaseState;
+    if (searchValues?.id) {
+      params.id = searchValues.id;
     }
 
-    if (sourceQueryType) {
-      params.sourceType = sourceQueryType;
+    /**
+     * 如果后端实时任务列表接口查的是 lastJobStatus，
+     * 这里可以改成：
+     * params.lastJobStatus = searchValues.status;
+     */
+    if (searchValues?.status) {
+      params.status = searchValues.status;
     }
 
-    if (sinkQueryType) {
-      params.sinkType = sinkQueryType;
+    if (searchValues?.sourceType) {
+      params.sourceType = searchValues.sourceType;
+    }
+
+    if (searchValues?.sinkType) {
+      params.sinkType = searchValues.sinkType;
+    }
+
+    if (searchValues?.sourceTable?.trim()) {
+      params.sourceTable = searchValues.sourceTable.trim();
+    }
+
+    if (searchValues?.sinkTable?.trim()) {
+      params.sinkTable = searchValues.sinkTable.trim();
+    }
+
+    /**
+     * 如果后端 DTO 字段不是 startTime / endTime，
+     * 可以改成 createTimeStart / createTimeEnd。
+     */
+    if (searchValues?.createTime?.length === 2) {
+      params.createTimeStart = moment(searchValues.createTime[0]).format(
+        "YYYY-MM-DD HH:mm:ss"
+      );
+      params.createTimeEnd = moment(searchValues.createTime[1]).format(
+        "YYYY-MM-DD HH:mm:ss"
+      );
     }
 
     return params;
-  }, [current, pageSize, keyword, releaseState, sourceQueryType, sinkQueryType]);
+  }, [pagination.current, pagination.pageSize, searchValues]);
 
   const getPageRecords = (res: any) => {
     const payload = res?.data;
@@ -113,22 +257,38 @@ const RealtimeSyncPage: React.FC = () => {
       if (res?.code !== undefined && res.code !== 0) {
         message.error(res?.message || "查询实时任务列表失败");
         setDataSource([]);
-        setTotal(0);
+        setPagination((prev) => ({
+          ...prev,
+          total: 0,
+        }));
         return;
       }
 
       const { records, total: nextTotal } = getPageRecords(res);
 
       setDataSource(records || []);
-      setTotal(nextTotal || 0);
+      setPagination((prev) => ({
+        ...prev,
+        total: nextTotal || 0,
+      }));
     } catch (error) {
       message.error("查询实时任务列表失败");
       setDataSource([]);
-      setTotal(0);
+      setPagination((prev) => ({
+        ...prev,
+        total: 0,
+      }));
     } finally {
       setLoading(false);
     }
   }, [queryParams]);
+
+  useEffect(() => {
+    syncUrlParams(searchValues, {
+      current: pagination.current,
+      pageSize: pagination.pageSize,
+    });
+  }, [searchValues, pagination.current, pagination.pageSize]);
 
   useEffect(() => {
     loadData();
@@ -151,7 +311,7 @@ const RealtimeSyncPage: React.FC = () => {
       const data = await seatunnelStremJobDefinitionApi.getUniqueId();
 
       if (data?.code !== 0) {
-        message.error(data?.message  || "获取实时任务ID失败");
+        message.error(data?.message || "获取实时任务ID失败");
         return;
       }
 
@@ -168,7 +328,7 @@ const RealtimeSyncPage: React.FC = () => {
           id: returnId,
           sourceType,
           targetType: sinkType,
-        }),
+        })
       );
 
       history.push(`/sync/stream-link-up/${returnId}/detail`);
@@ -179,36 +339,35 @@ const RealtimeSyncPage: React.FC = () => {
     }
   };
 
+  const handleSearch = (values: SearchValues) => {
+    setSearchValues(values || {});
+    setPagination((prev) => ({
+      ...prev,
+      current: 1,
+    }));
+    setSelectedRowKeys([]);
+  };
+
   const handleReset = () => {
-    setKeyword("");
-    setReleaseState(undefined);
-    setSourceQueryType(undefined);
-    setSinkQueryType(undefined);
-    setCurrent(1);
+    setSearchValues({
+      createTime: DEFAULT_TIME_RANGE,
+    });
+
+    setPagination((prev) => ({
+      ...prev,
+      current: 1,
+    }));
+
     setSelectedRowKeys([]);
   };
 
-  const handleKeywordChange = (value: string) => {
-    setKeyword(value);
-    setCurrent(1);
-    setSelectedRowKeys([]);
-  };
+  const handlePaginationChange = (page: number, pageSize: number) => {
+    setPagination((prev) => ({
+      ...prev,
+      current: page,
+      pageSize,
+    }));
 
-  const handleReleaseStateChange = (value?: string) => {
-    setReleaseState(value);
-    setCurrent(1);
-    setSelectedRowKeys([]);
-  };
-
-  const handleSourceTypeChange = (value?: string) => {
-    setSourceQueryType(value);
-    setCurrent(1);
-    setSelectedRowKeys([]);
-  };
-
-  const handleSinkTypeChange = (value?: string) => {
-    setSinkQueryType(value);
-    setCurrent(1);
     setSelectedRowKeys([]);
   };
 
@@ -223,7 +382,9 @@ const RealtimeSyncPage: React.FC = () => {
     }
 
     try {
-      const res = await seatunnelStremJobDefinitionApi.selectEditDetail(record.id);
+      const res = await seatunnelStremJobDefinitionApi.selectEditDetail(
+        record.id
+      );
 
       if (res?.code !== 0) {
         message.error(res?.message || res?.msg || "查询编辑详情失败");
@@ -242,7 +403,8 @@ const RealtimeSyncPage: React.FC = () => {
       return;
     }
 
-    const isOnline = record.releaseState === "ONLINE" || record.releaseState === 1;
+    const isOnline =
+      record.releaseState === "ONLINE" || record.releaseState === 1;
 
     if (!isOnline) {
       message.warning("请先上线任务，再执行运行操作");
@@ -271,10 +433,12 @@ const RealtimeSyncPage: React.FC = () => {
     }
 
     try {
-      const res = await seatunnelStreamingJobExecuteApi.pause(record.instanceId);
+      const res = await seatunnelStreamingJobExecuteApi.pause(
+        record.instanceId
+      );
 
       if (res?.code !== 0) {
-        message.error( res?.msg || "停止实时任务失败");
+        message.error(res?.msg || "停止实时任务失败");
         return;
       }
 
@@ -355,7 +519,9 @@ const RealtimeSyncPage: React.FC = () => {
       },
       async onOk() {
         try {
-          const res = await seatunnelStremJobDefinitionApi.delete(String(record.id));
+          const res = await seatunnelStremJobDefinitionApi.delete(
+            String(record.id)
+          );
 
           if (res?.code !== 0) {
             message.error(res?.msg || "删除实时任务失败");
@@ -366,8 +532,11 @@ const RealtimeSyncPage: React.FC = () => {
 
           setSelectedRowKeys((prev) => prev.filter((key) => key !== record.id));
 
-          if (dataSource.length === 1 && current > 1) {
-            setCurrent(current - 1);
+          if (dataSource.length === 1 && pagination.current > 1) {
+            setPagination((prev) => ({
+              ...prev,
+              current: prev.current - 1,
+            }));
           } else {
             loadData();
           }
@@ -384,12 +553,9 @@ const RealtimeSyncPage: React.FC = () => {
       return;
     }
 
-    /**
-     * 这里先跳转到详情页的日志视图。
-     * 如果你后面有独立实例页，可以改成：
-     * history.push(`/sync/stream-link-up/${record.id}/instances`);
-     */
-    history.push(`/sync/stream-link-up/${record.id}/detail?tab=logs&readonly=true`);
+    history.push(
+      `/sync/stream-link-up/${record.id}/detail?tab=logs&readonly=true`
+    );
   };
 
   const handleCheckpoint = (record: StreamingJobDefinitionVO) => {
@@ -411,7 +577,7 @@ const RealtimeSyncPage: React.FC = () => {
 
     try {
       await Promise.all(
-        selectedRowKeys.map((id) => seatunnelStremJobDefinitionApi.online(id)),
+        selectedRowKeys.map((id) => seatunnelStremJobDefinitionApi.online(id))
       );
 
       message.success(`已提交 ${selectedRowKeys.length} 个实时任务上线请求`);
@@ -427,7 +593,7 @@ const RealtimeSyncPage: React.FC = () => {
 
     try {
       await Promise.all(
-        selectedRowKeys.map((id) => seatunnelStremJobDefinitionApi.offline(id)),
+        selectedRowKeys.map((id) => seatunnelStremJobDefinitionApi.offline(id))
       );
 
       message.success(`已提交 ${selectedRowKeys.length} 个实时任务下线请求`);
@@ -451,14 +617,8 @@ const RealtimeSyncPage: React.FC = () => {
 
       <div className="mb-5 overflow-hidden">
         <SearchToolbar
-          keyword={keyword}
-          releaseState={releaseState}
-          sourceType={sourceQueryType}
-          sinkType={sinkQueryType}
-          onKeywordChange={handleKeywordChange}
-          onReleaseStateChange={handleReleaseStateChange}
-          onSourceTypeChange={handleSourceTypeChange}
-          onSinkTypeChange={handleSinkTypeChange}
+          initialValues={searchValues}
+          onSearch={handleSearch}
           onReset={handleReset}
         />
 
@@ -490,11 +650,14 @@ const RealtimeSyncPage: React.FC = () => {
       ) : null}
 
       <BottomActionBar
-        total={total}
+        total={pagination.total}
         selectedCount={selectedRowKeys.length}
         disabled={!hasSelected}
         onStart={handleBatchStart}
         onStop={handleBatchStop}
+        current={pagination.current}
+        pageSize={pagination.pageSize}
+        onPageChange={handlePaginationChange}
       />
     </div>
   );
