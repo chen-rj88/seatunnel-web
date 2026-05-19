@@ -408,6 +408,79 @@ CREATE TABLE `t_seatunnel_streaming_job_definition_content`
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='实时任务定义内容表';
 
 
+
+CREATE TABLE t_seatunnel_streaming_job_table_metrics
+(
+    collect_time_ms   BIGINT         NOT NULL COMMENT '采集时间戳，毫秒',
+    job_instance_id   BIGINT         NOT NULL,
+    job_definition_id BIGINT         NOT NULL,
+    engine_job_id     BIGINT NULL,
+    client_id         BIGINT NULL,
+
+    pipeline_id       INT            NOT NULL DEFAULT 0,
+
+    source_table      VARCHAR(512) NULL,
+    sink_table        VARCHAR(512) NULL,
+    table_key         VARCHAR(1024)  NOT NULL COMMENT 'source/sink 合成 key',
+    table_key_hash    CHAR(32)       NOT NULL COMMENT 'table_key MD5 hash',
+
+    read_row_count    BIGINT         NOT NULL DEFAULT 0,
+    write_row_count   BIGINT         NOT NULL DEFAULT 0,
+    read_qps          DECIMAL(20, 4) NOT NULL DEFAULT 0,
+    write_qps         DECIMAL(20, 4) NOT NULL DEFAULT 0,
+
+    read_bytes        BIGINT         NOT NULL DEFAULT 0,
+    write_bytes       BIGINT         NOT NULL DEFAULT 0,
+    read_bps          DECIMAL(20, 4) NOT NULL DEFAULT 0,
+    write_bps         DECIMAL(20, 4) NOT NULL DEFAULT 0,
+
+    status            VARCHAR(32) NULL,
+    error_msg         TEXT NULL,
+
+    collect_time      DATETIME       NOT NULL,
+    create_time       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (job_instance_id, collect_time_ms, pipeline_id, table_key_hash),
+    KEY               idx_streaming_table_definition_time (job_definition_id, collect_time_ms),
+    KEY               idx_streaming_table_source_time (source_table, collect_time_ms),
+    KEY               idx_streaming_table_sink_time (sink_table, collect_time_ms),
+    KEY               idx_streaming_table_key_hash (table_key_hash)
+) COMMENT='SeaTunnel streaming table metrics snapshot';
+
+
+CREATE TABLE t_seatunnel_streaming_job_metrics
+(
+    collect_time_ms         BIGINT         NOT NULL COMMENT '采集时间戳，毫秒',
+    job_instance_id         BIGINT         NOT NULL COMMENT 'Web 侧实例 ID',
+    job_definition_id       BIGINT         NOT NULL COMMENT '任务定义 ID',
+    engine_job_id           BIGINT NULL COMMENT 'SeaTunnel Engine Job ID',
+    client_id               BIGINT NULL COMMENT 'SeaTunnel Client ID',
+
+    pipeline_id             INT            NOT NULL DEFAULT 0 COMMENT 'Pipeline ID',
+    job_status              VARCHAR(32) NULL COMMENT 'Engine 返回任务状态',
+
+    read_row_count          BIGINT         NOT NULL DEFAULT 0,
+    write_row_count         BIGINT         NOT NULL DEFAULT 0,
+    read_qps                DECIMAL(20, 4) NOT NULL DEFAULT 0,
+    write_qps               DECIMAL(20, 4) NOT NULL DEFAULT 0,
+
+    read_bytes              BIGINT         NOT NULL DEFAULT 0,
+    write_bytes             BIGINT         NOT NULL DEFAULT 0,
+    read_bps                DECIMAL(20, 4) NOT NULL DEFAULT 0,
+    write_bps               DECIMAL(20, 4) NOT NULL DEFAULT 0,
+
+    intermediate_queue_size BIGINT         NOT NULL DEFAULT 0,
+    lag_count               BIGINT         NOT NULL DEFAULT 0,
+    record_delay            BIGINT         NOT NULL DEFAULT 0,
+
+    collect_time            DATETIME       NOT NULL COMMENT '采集时间',
+    create_time             DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (job_instance_id, collect_time_ms, pipeline_id),
+    KEY                     idx_streaming_metrics_definition_time (job_definition_id, collect_time_ms),
+    KEY                     idx_streaming_metrics_engine_time (engine_job_id, collect_time_ms)
+) COMMENT='SeaTunnel streaming pipeline metrics snapshot';
+
 -- ----------------------------
 -- Table structure for qrtz_blob_triggers
 -- ----------------------------

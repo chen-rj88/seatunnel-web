@@ -37,4 +37,6 @@ public class JobRuntimeContext {
     private String configFile;
 
     private Long clientId;
+
+    private String jobType;
 }
