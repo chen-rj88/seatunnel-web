@@ -1,42 +1,12 @@
 @font-face {
-  font-family: "AlibabaSans";
-  font-style: normal;
-  font-weight: 300;
-  font-display: swap;
-  src: url("//mdn.alipayobjects.com/huamei_iwk9zp/afts/file/A*1GSgSYDD_aIAAAAAQsAAAAgAegCCAQ/AlibabaSans-Light.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "AlibabaSans";
+  font-family: st-web;
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("//mdn.alipayobjects.com/huamei_iwk9zp/afts/file/A*2zEUQqnPNesAAAAAQtAAAAgAegCCAQ/AlibabaSans-Regular.woff2") format("woff2");
+  src: url("@/assets/web.woff2") format("woff2");
 }
 
-@font-face {
-  font-family: "AlibabaSans";
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url("//mdn.alipayobjects.com/huamei_iwk9zp/afts/file/A*E_cxRbMlZqUAAAAAQuAAAAgAegCCAQ/AlibabaSans-Medium.woff2") format("woff2");
-}
 
-@font-face {
-  font-family: "AlibabaSans";
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url("//mdn.alipayobjects.com/huamei_iwk9zp/afts/file/A*E_cxRbMlZqUAAAAAQuAAAAgAegCCAQ/AlibabaSans-Bold.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "AlibabaSans";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("//mdn.alipayobjects.com/huamei_iwk9zp/afts/file/A*E_cxRbMlZqUAAAAAQuAAAAgAegCCAQ/AlibabaSans-Heavy.woff2") format("woff2");
-}
 
 html,
 body,
@@ -45,7 +15,11 @@ body,
   height: 100%;
   margin: 0;
   padding: 0;
-  font-family: Inter, sans-serif;
+  font-family: Inter, sans-serif, st-web;
+}
+
+.st-web-font {
+  font-family: st-web;
 }
 
 .colorWeak {
@@ -80,13 +54,14 @@ ol {
     width: 100%;
     overflow-x: auto;
 
-    &-thead > tr,
-    &-tbody > tr {
-      > th,
-      > td {
+    &-thead>tr,
+    &-tbody>tr {
+
+      >th,
+      >td {
         white-space: pre;
 
-        > span {
+        >span {
           display: block;
         }
       }
@@ -119,7 +94,7 @@ ol {
   margin-left: 99px;
 }
 
-.ant-menu-light.ant-menu-horizontal > .ant-menu-item-selected {
+.ant-menu-light.ant-menu-horizontal>.ant-menu-item-selected {
   color: hsl(231 48% 48%);
   font-weight: 700;
   background-color: white;
@@ -162,7 +137,7 @@ ol {
   align-items: center;
 }
 
-.ant-menu-light.ant-menu-horizontal > .ant-menu-item:hover {
+.ant-menu-light.ant-menu-horizontal>.ant-menu-item:hover {
   border-radius: 12px;
 }
 
@@ -272,12 +247,12 @@ ol {
   line-height: 24px;
 }
 
-.ant-table-wrapper .ant-table-thead > tr > th {
+.ant-table-wrapper .ant-table-thead>tr>th {
   padding: 8px 8px;
   font-size: 12px;
 }
 
-.ant-table-wrapper .ant-table-tbody > tr > td {
+.ant-table-wrapper .ant-table-tbody>tr>td {
   padding: 6px 6px;
   font-size: 12px;
 }
@@ -286,7 +261,7 @@ ol {
   height: 30px;
 }
 
-.ant-tabs-card.ant-tabs-top > .ant-tabs-nav .ant-tabs-tab {
+.ant-tabs-card.ant-tabs-top>.ant-tabs-nav .ant-tabs-tab {
   border-radius: 0px !important;
 }
 
@@ -294,15 +269,15 @@ ol {
   padding: 8px 0 !important;
 }
 
-.ant-tabs-card.ant-tabs-top > .ant-tabs-nav .ant-tabs-tab + .ant-tabs-tab {
+.ant-tabs-card.ant-tabs-top>.ant-tabs-nav .ant-tabs-tab+.ant-tabs-tab {
   margin-left: 0px !important;
 }
 
-.ant-tabs-card.ant-tabs-top > .ant-tabs-nav .ant-tabs-tab-active {
+.ant-tabs-card.ant-tabs-top>.ant-tabs-nav .ant-tabs-tab-active {
   border-top: 2px solid hsl(231 48% 48%);
 }
 
-.ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
+.ant-tabs-card>.ant-tabs-nav .ant-tabs-tab {
   border: none;
   border-right: 1px solid #f0f0f0;
   transition: none !important;
@@ -352,7 +327,7 @@ ol {
   color: #9ca1ba;
 }
 
-.ant-form-item .ant-form-item-label > label {
+.ant-form-item .ant-form-item-label>label {
   font-size: 13px !important;
   color: rgba(78, 83, 90, 1);
 }
@@ -365,7 +340,7 @@ ol {
   font-size: 12px !important;
 }
 
-.ant-descriptions .ant-descriptions-row > td {
+.ant-descriptions .ant-descriptions-row>td {
   padding-bottom: 8px;
 }
 
@@ -390,7 +365,7 @@ ol {
 
 .ant-input {
   font-size: 13px !important;
-  font-family: "Inter, sans-serif";
+  font-family: "st-web, sans-serif";
   border-radius: 16px;
 }
 
@@ -413,9 +388,7 @@ ol {
   width: auto;
 }
 
-.ant-pro-base-menu-inline-item-title .ant-pro-base-menu-inline-item-text {
-  font-size: 13px !important;
-}
+
 
 .ant-tree-select-dropdown .ant-select-tree {
   font-size: 12px !important;
@@ -496,7 +469,7 @@ ol {
   border-block-end: none !important;
 }
 
-.ant-tabs-top > .ant-tabs-nav {
+.ant-tabs-top>.ant-tabs-nav {
   margin: 0;
 }
 
@@ -535,7 +508,7 @@ ol {
   background-color: transparent !important;
 }
 
-.ant-picker .ant-picker-input > input {
+.ant-picker .ant-picker-input>input {
   font-size: 13px !important;
   padding: 2px;
 }
@@ -557,7 +530,7 @@ ol {
   margin-inline-start: 16px;
 }
 
-.ant-steps .ant-steps-item-process .ant-steps-item-icon > .ant-steps-icon {
+.ant-steps .ant-steps-item-process .ant-steps-item-icon>.ant-steps-icon {
   color: rgba(0, 51, 204, 0.9);
 }
 
@@ -654,7 +627,7 @@ ol {
   color: rgba(0, 0, 0, 0.8) !important;
 }
 
-.ant-pro-global-header-header-actions-avatar > div {
+.ant-pro-global-header-header-actions-avatar>div {
   border-radius: 999px;
   padding-inline: 4px;
   height: 40px;
@@ -669,7 +642,7 @@ ol {
 }
 
 .ant-form-item-explain-error {
-  font-family: "Inter, sans-serif";
+  font-family: "st-web, sans-serif";
 }
 
 .ant-select-selector {
@@ -739,7 +712,9 @@ ol {
   overflow: hidden;
   word-break: break-all;
   white-space: nowrap;
-  font-size: 13px !important;
+  // color: rgb(64,64,64);
+  font-size: 0.875rem !important;
+  font-family: st-web, sans-serif;
   display: inline-block;
   transition:
     opacity 0.22s ease,
@@ -747,7 +722,7 @@ ol {
 }
 
 .ant-layout {
-  > div:first-child[style*='width'] {
+  >div:first-child[style*='width'] {
     width: var(--pro-sider-current-width) !important;
     min-width: var(--pro-sider-current-width) !important;
     max-width: var(--pro-sider-current-width) !important;
@@ -761,7 +736,7 @@ ol {
       flex-basis var(--pro-sider-transition-duration) ease !important;
   }
 
-  > aside.ant-layout-sider.ant-pro-sider {
+  >aside.ant-layout-sider.ant-pro-sider {
     width: var(--pro-sider-current-width) !important;
     min-width: var(--pro-sider-current-width) !important;
     max-width: var(--pro-sider-current-width) !important;
@@ -831,7 +806,7 @@ ol {
   &:has(> aside.ant-layout-sider.ant-pro-sider:hover) {
     --pro-sider-current-width: var(--pro-sider-expanded-width);
 
-    > aside.ant-layout-sider.ant-pro-sider {
+    >aside.ant-layout-sider.ant-pro-sider {
       .ant-pro-base-menu-inline-item-text {
         opacity: 1 !important;
         transform: translateX(0) !important;
@@ -854,7 +829,8 @@ ol {
    注意：放在展开动画后面，避免被 transform 覆盖
    ========================= */
 .ant-layout {
-  > aside.ant-layout-sider.ant-pro-sider {
+  >aside.ant-layout-sider.ant-pro-sider {
+
     .ant-menu-item,
     .ant-menu-submenu-title {
       .ant-pro-base-menu-inline-item-text {
@@ -868,7 +844,8 @@ ol {
   }
 
   &:has(> aside.ant-layout-sider.ant-pro-sider:hover) {
-    > aside.ant-layout-sider.ant-pro-sider {
+    >aside.ant-layout-sider.ant-pro-sider {
+
       .ant-menu-item:hover .ant-pro-base-menu-inline-item-text,
       .ant-menu-submenu-title:hover .ant-pro-base-menu-inline-item-text {
         transform: translateX(4px) !important;
@@ -942,6 +919,9 @@ ol {
   overflow: hidden !important;
   white-space: nowrap !important;
   font-weight: 500 !important;
+  font-family: st-web !important;
+  font-size: 16px !important;
+  color: #000 !important;
 
   transition:
     opacity 0.12s ease,
