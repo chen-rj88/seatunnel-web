@@ -1,0 +1,12 @@
+package org.apache.seatunnel.web.spi.bean.vo;
+
+import lombok.Data;
+
+import java.util.ArrayList;
+import java.util.List;
+
+@Data
+public class StreamingMetricsTrendVO {
+
+    private List<StreamingMetricsTrendItemVO> items = new ArrayList<>();
+}

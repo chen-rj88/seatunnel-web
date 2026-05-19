@@ -2,6 +2,7 @@ package org.apache.seatunnel.web.api.metrics;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.seatunnel.web.api.metrics.streaming.StreamingJobMetricsMonitor;
 import org.apache.seatunnel.web.common.enums.JobSubmitStage;
 import org.apache.seatunnel.web.common.exception.JobSubmitException;
 import org.apache.seatunnel.web.core.exceptions.ServiceException;
@@ -17,20 +18,44 @@ import java.util.Map;
 @Slf4j
 public class JobSubmitter {
 
+    private static final String JOB_TYPE_STREAMING = "STREAMING";
+    private static final String JOB_TYPE_BATCH = "BATCH";
+
     private final JobConfigFileService configFileService;
     private final SeaTunnelRestClient restClient;
-    private final JobMetricsMonitor metricsMonitor;
+
+    /**
+     * Batch / offline metrics monitor.
+     *
+     * <p>
+     * Keep the old JobMetricsMonitor for batch job final metrics snapshot.
+     * </p>
+     */
+    private final JobMetricsMonitor batchMetricsMonitor;
+
+    /**
+     * Streaming metrics monitor.
+     *
+     * <p>
+     * Streaming jobs use a separated metrics pipeline:
+     * EngineMetricsFetchService -> StreamingJobInfoMetricsParser -> StreamingJobMetricsService.
+     * </p>
+     */
+    private final StreamingJobMetricsMonitor streamingMetricsMonitor;
+
     private final JobResultWatcher resultWatcher;
     private final JobResultHandler resultHandler;
 
     public JobSubmitter(JobConfigFileService configFileService,
                         SeaTunnelRestClient restClient,
-                        JobMetricsMonitor metricsMonitor,
+                        JobMetricsMonitor batchMetricsMonitor,
+                        StreamingJobMetricsMonitor streamingMetricsMonitor,
                         JobResultWatcher resultWatcher,
                         JobResultHandler resultHandler) {
         this.configFileService = configFileService;
         this.restClient = restClient;
-        this.metricsMonitor = metricsMonitor;
+        this.batchMetricsMonitor = batchMetricsMonitor;
+        this.streamingMetricsMonitor = streamingMetricsMonitor;
         this.resultWatcher = resultWatcher;
         this.resultHandler = resultHandler;
     }
@@ -80,14 +105,12 @@ public class JobSubmitter {
             resultHandler.updateEngineId(instanceId, engineId);
 
             JobRuntimeContext ctx = buildRuntimeContext(
-                    instanceId,
-                    jobDefinitionId,
-                    clientId,
+                    instance,
                     engineId,
                     configFile
             );
 
-            registerPostSubmitWatchers(ctx, jobLogger);
+            registerPostSubmitWatchers(instance, ctx, jobLogger);
 
             jobLogger.info("=== Job Submit Complete ===");
 
@@ -130,57 +153,23 @@ public class JobSubmitter {
                 instanceId, clientId, engineJobId, resp);
     }
 
-    private void validate(JobInstanceVO instance) {
-        if (instance == null) {
-            throw new IllegalArgumentException("Job instance must not be null");
-        }
-
-        if (instance.getId() == null) {
-            throw new IllegalArgumentException("Job instance id must not be null");
-        }
-
-        if (instance.getClientId() == null) {
-            throw new IllegalArgumentException("Job client id must not be null");
-        }
-
-        if (StringUtils.isBlank(instance.getLogPath())) {
-            throw new IllegalArgumentException("Job log path must not be blank");
-        }
-
-        if (StringUtils.isBlank(instance.getRuntimeConfig())) {
-            throw new IllegalArgumentException("Job runtime config must not be blank");
-        }
-    }
-
-    private JobRuntimeContext buildRuntimeContext(Long instanceId,
-                                                  Long jobDefinitionId,
-                                                  Long clientId,
-                                                  Long engineId,
-                                                  String configFile) {
-        JobRuntimeContext ctx = new JobRuntimeContext();
-        ctx.setInstanceId(instanceId);
-        ctx.setJobDefinitionId(jobDefinitionId);
-        ctx.setClientId(clientId);
-        ctx.setEngineId(engineId);
-        ctx.setConfigFile(configFile);
-        return ctx;
-    }
-
-    private void registerPostSubmitWatchers(JobRuntimeContext ctx,
+    private void registerPostSubmitWatchers(JobInstanceVO instance,
+                                            JobRuntimeContext ctx,
                                             JobFileLogger jobLogger) {
         boolean metricsRegistered = false;
         boolean watcherRegistered = false;
 
         try {
-            metricsMonitor.register(ctx);
+            registerMetricsMonitor(instance, ctx, jobLogger);
             metricsRegistered = true;
-            jobLogger.info("Metrics monitor registered");
         } catch (Exception e) {
             jobLogger.warn("Metrics monitor register failed: " + e.getMessage());
+
             log.warn(
-                    "Metrics monitor register failed, instanceId={}, engineId={}",
+                    "Metrics monitor register failed, instanceId={}, engineId={}, jobType={}",
                     ctx.getInstanceId(),
                     ctx.getEngineId(),
+                    ctx.getJobType(),
                     e
             );
         }
@@ -191,10 +180,12 @@ public class JobSubmitter {
             jobLogger.info("REST result watcher registered");
         } catch (Exception e) {
             jobLogger.warn("Result watcher register failed: " + e.getMessage());
+
             log.warn(
-                    "Result watcher register failed, instanceId={}, engineId={}",
+                    "Result watcher register failed, instanceId={}, engineId={}, jobType={}",
                     ctx.getInstanceId(),
                     ctx.getEngineId(),
+                    ctx.getJobType(),
                     e
             );
         }
@@ -207,6 +198,120 @@ public class JobSubmitter {
                             ", watcherRegistered=" + watcherRegistered
             );
         }
+    }
+
+    private void registerMetricsMonitor(JobInstanceVO instance,
+                                        JobRuntimeContext ctx,
+                                        JobFileLogger jobLogger) {
+        if (isStreamingJob(instance, ctx)) {
+            streamingMetricsMonitor.register(ctx);
+            jobLogger.info("Streaming metrics monitor registered");
+            log.info("Streaming metrics monitor registered, instanceId={}, engineId={}",
+                    ctx.getInstanceId(), ctx.getEngineId());
+            return;
+        }
+
+        batchMetricsMonitor.register(ctx);
+        jobLogger.info("Batch metrics monitor registered");
+        log.info("Batch metrics monitor registered, instanceId={}, engineId={}",
+                ctx.getInstanceId(), ctx.getEngineId());
+    }
+
+    private JobRuntimeContext buildRuntimeContext(JobInstanceVO instance,
+                                                  Long engineId,
+                                                  String configFile) {
+        JobRuntimeContext ctx = new JobRuntimeContext();
+
+        ctx.setInstanceId(instance.getId());
+        ctx.setJobDefinitionId(instance.getJobDefinitionId());
+        ctx.setClientId(instance.getClientId());
+        ctx.setEngineId(engineId);
+        ctx.setConfigFile(configFile);
+        ctx.setJobType(resolveJobType(instance));
+
+        return ctx;
+    }
+
+    private String resolveJobType(JobInstanceVO instance) {
+        if (instance == null) {
+            return JOB_TYPE_BATCH;
+        }
+
+        /*
+         * Prefer jobType if your JobInstanceVO has this field.
+         *
+         * In your project, some places use job type / mode to distinguish batch
+         * and streaming. If JobInstanceVO does not currently expose getJobType(),
+         * you can either:
+         *
+         * 1. add jobType to JobInstanceVO;
+         * 2. add jobType to JobRuntimeContext when creating instance;
+         * 3. or fallback to runtimeConfig contains "mode=STREAMING".
+         */
+
+        try {
+            Object jobType = instance.getClass().getMethod("getJobType").invoke(instance);
+            if (jobType != null) {
+                return String.valueOf(jobType);
+            }
+        } catch (Exception ignored) {
+            // JobInstanceVO may not have getJobType now.
+        }
+
+        try {
+            Object runMode = instance.getClass().getMethod("getRunMode").invoke(instance);
+            if (runMode != null) {
+                String value = String.valueOf(runMode);
+                if (JOB_TYPE_STREAMING.equalsIgnoreCase(value)) {
+                    return JOB_TYPE_STREAMING;
+                }
+                if (JOB_TYPE_BATCH.equalsIgnoreCase(value)) {
+                    return JOB_TYPE_BATCH;
+                }
+            }
+        } catch (Exception ignored) {
+            // JobInstanceVO may not have getRunMode now.
+        }
+
+        String runtimeConfig = instance.getRuntimeConfig();
+        if (isStreamingRuntimeConfig(runtimeConfig)) {
+            return JOB_TYPE_STREAMING;
+        }
+
+        return JOB_TYPE_BATCH;
+    }
+
+    private boolean isStreamingJob(JobInstanceVO instance,
+                                   JobRuntimeContext ctx) {
+        if (ctx != null && JOB_TYPE_STREAMING.equalsIgnoreCase(ctx.getJobType())) {
+            return true;
+        }
+
+        if (instance == null) {
+            return false;
+        }
+
+        String runtimeConfig = instance.getRuntimeConfig();
+        return isStreamingRuntimeConfig(runtimeConfig);
+    }
+
+    private boolean isStreamingRuntimeConfig(String runtimeConfig) {
+        if (StringUtils.isBlank(runtimeConfig)) {
+            return false;
+        }
+
+        String normalized = runtimeConfig
+                .replace(" ", "")
+                .replace("\n", "")
+                .replace("\r", "")
+                .replace("\t", "")
+                .toUpperCase();
+
+        return normalized.contains("MODE=STREAMING")
+                || normalized.contains("MODE:STREAMING")
+                || normalized.contains("JOB.MODE=STREAMING")
+                || normalized.contains("JOB{MODE=STREAMING}")
+                || normalized.contains("JOB={MODE=STREAMING}");
     }
 
     private void handleCoreFailure(JobFileLogger jobLogger,
@@ -259,6 +364,28 @@ public class JobSubmitter {
         }
 
         return Long.valueOf(jobIdObj.toString());
+    }
+
+    private void validate(JobInstanceVO instance) {
+        if (instance == null) {
+            throw new IllegalArgumentException("Job instance must not be null");
+        }
+
+        if (instance.getId() == null) {
+            throw new IllegalArgumentException("Job instance id must not be null");
+        }
+
+        if (instance.getClientId() == null) {
+            throw new IllegalArgumentException("Job client id must not be null");
+        }
+
+        if (StringUtils.isBlank(instance.getLogPath())) {
+            throw new IllegalArgumentException("Job log path must not be blank");
+        }
+
+        if (StringUtils.isBlank(instance.getRuntimeConfig())) {
+            throw new IllegalArgumentException("Job runtime config must not be blank");
+        }
     }
 
     private String safeConfig(String config) {
