@@ -1,5 +1,6 @@
 package org.apache.seatunnel.web.api.service.support;
 
+import org.apache.seatunnel.web.common.enums.JobMode;
 import org.apache.seatunnel.web.common.enums.JobStatus;
 import org.apache.seatunnel.web.common.enums.RunMode;
 import org.apache.seatunnel.web.dao.entity.JobInstance;
@@ -18,7 +19,7 @@ public class JobInstanceFactory {
                               Long instanceId,
                               String runtimeConfig,
                               RunMode runMode,
-                              String logPath) {
+                              String logPath, JobMode jobMode) {
         Date now = new Date();
 
         return JobInstance.builder()
@@ -30,6 +31,7 @@ public class JobInstanceFactory {
                 .triggerSource(resolveTriggerSource(runMode))
                 .retryCount(0)
                 .runtimeConfig(runtimeConfig)
+                .jobMode(jobMode)
                 .logPath(logPath)
                 .submitTime(now)
                 .startTime(now)

@@ -6,7 +6,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import jakarta.annotation.Resource;
 import lombok.NonNull;
+import org.apache.seatunnel.web.common.enums.JobMode;
 import org.apache.seatunnel.web.common.enums.JobStatus;
+import org.apache.seatunnel.web.common.utils.ConvertUtil;
 import org.apache.seatunnel.web.dao.entity.JobInstance;
 import org.apache.seatunnel.web.dao.mapper.JobInstanceMapper;
 import org.apache.seatunnel.web.dao.repository.BaseDao;
@@ -15,7 +17,10 @@ import org.apache.seatunnel.web.spi.bean.dto.SeaTunnelJobInstanceDTO;
 import org.apache.seatunnel.web.spi.bean.vo.JobInstanceVO;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collections;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Repository
 public class JobInstanceDaoImpl
@@ -129,6 +134,37 @@ public class JobInstanceDaoImpl
         }
 
         jobInstanceMapper.updateById(update);
+    }
+
+    @Override
+    public List<JobInstanceVO> listRunningByJobType(JobMode jobMode) {
+        if (jobMode == null) {
+            return Collections.emptyList();
+        }
+
+        LambdaQueryWrapper<JobInstance> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(JobInstance::getJobMode, jobMode)
+                .isNotNull(JobInstance::getClientId)
+                .isNotNull(JobInstance::getEngineJobId)
+                .in(JobInstance::getJobStatus,
+                        JobStatus.INITIALIZING,
+                        JobStatus.CREATED,
+                        JobStatus.PENDING,
+                        JobStatus.SCHEDULED,
+                        JobStatus.RUNNING,
+                        JobStatus.FAILING,
+                        JobStatus.DOING_SAVEPOINT,
+                        JobStatus.CANCELING);
+
+        List<JobInstance> records = jobInstanceMapper.selectList(wrapper);
+
+        if (records == null || records.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return records.stream()
+                .map(item -> ConvertUtil.sourceToTarget(item, JobInstanceVO.class))
+                .collect(Collectors.toList());
     }
 
     private String truncate(String text, int maxLength) {

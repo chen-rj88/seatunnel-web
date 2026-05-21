@@ -3,6 +3,8 @@ import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import React from "react";
 
 import TaskStatus from "@/pages/batch-link-up/components/SyncTaskList/components/TaskStatus";
+import ExecutionStatus from "./ExecutionStatus";
+import RealtimeMetricsTrend from "./RealtimeMetricsTrend";
 import RealtimeSyncPlan from "./RealtimeSyncPlan";
 import RealtimeTaskActionColumn, {
   StreamingJobDefinitionVO,
@@ -77,18 +79,34 @@ const RealtimeTaskTable: React.FC<RealtimeTaskTableProps> = ({
     {
       title: "数据同步方案",
       dataIndex: "syncPlan",
-      width: 360,
+      width: 300,
       render: (_, record) => <RealtimeSyncPlan record={record} />,
     },
     {
       title: "状态",
       dataIndex: "taskParams",
-      width: "10%",
+      width: "8%",
       render: (_content: any, record: any) => (
         <TaskStatus
           status={record?.lastJobStatus}
           errorMessage={record?.lastErrorMessage}
         />
+      ),
+    },
+    {
+      title: "趋势",
+      dataIndex: "metricsTrend",
+      width: 360,
+      render: (_content: any, record: StreamingJobDefinitionVO) => (
+        <RealtimeMetricsTrend record={record} />
+      ),
+    },
+    {
+      title: "执行概况",
+      dataIndex: "执行概况",
+      width: "15%",
+      render: (_content: any, record: any) => (
+        <ExecutionStatus record={record} />
       ),
     },
     {

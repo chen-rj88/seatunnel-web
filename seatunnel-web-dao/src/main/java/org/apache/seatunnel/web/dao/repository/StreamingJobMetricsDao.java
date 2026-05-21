@@ -11,7 +11,9 @@ public interface StreamingJobMetricsDao extends IDao<StreamingJobMetrics> {
 
     List<StreamingJobMetrics> selectByInstanceIdAndTimeRange(Long instanceId,
                                                              Long startTimeMs,
-                                                              Long endTimeMs);
+                                                             Long endTimeMs);
+
+    List<StreamingJobMetrics> selectRecentByInstanceId(Long instanceId, Integer limit);
 
     void deleteByInstanceId( Long instanceId);
 

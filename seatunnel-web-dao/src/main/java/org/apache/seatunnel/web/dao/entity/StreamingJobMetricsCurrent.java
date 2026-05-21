@@ -7,10 +7,8 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
-@TableName("t_seatunnel_streaming_job_metrics_snapshot")
-public class StreamingJobMetrics {
-
-    private Long collectTimeMs;
+@TableName("t_seatunnel_streaming_job_metrics_current")
+public class StreamingJobMetricsCurrent {
 
     private Long jobInstanceId;
 
@@ -19,8 +17,6 @@ public class StreamingJobMetrics {
     private Long engineJobId;
 
     private Long clientId;
-
-    private Integer pipelineId;
 
     private String jobStatus;
 
@@ -46,7 +42,15 @@ public class StreamingJobMetrics {
 
     private Long recordDelay;
 
-    private Date collectTime;
+    private Integer pipelineCount;
+
+    private Integer tableCount;
+
+    private Long lastCollectTimeMs;
+
+    private Date lastCollectTime;
 
     private Date createTime;
+
+    private Date updateTime;
 }

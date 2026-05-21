@@ -7,6 +7,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.web.api.service.StreamingJobInstanceService;
 import org.apache.seatunnel.web.api.service.support.JobInstanceFactory;
 import org.apache.seatunnel.web.api.utils.HoconSensitiveMaskUtil;
+import org.apache.seatunnel.web.common.enums.JobMode;
 import org.apache.seatunnel.web.common.enums.RunMode;
 import org.apache.seatunnel.web.common.utils.CodeGenerateUtils;
 import org.apache.seatunnel.web.common.utils.ConvertUtil;
@@ -61,7 +62,7 @@ public class StreamingJobInstanceServiceImpl implements StreamingJobInstanceServ
     private String baseLogDir;
 
     @Override
-    public JobInstanceVO create(Long jobDefineId, RunMode runMode) {
+    public JobInstanceVO create(Long jobDefineId, RunMode runMode, JobMode jobMode) {
         validateDefinitionId(jobDefineId);
         validateRunMode(runMode);
 
@@ -69,7 +70,7 @@ public class StreamingJobInstanceServiceImpl implements StreamingJobInstanceServ
             log.info("Creating streaming job instance, jobDefineId={}, runMode={}", jobDefineId, runMode);
 
             JobDefinitionSaveCommand command = loadDefinitionCommand(jobDefineId);
-            JobInstance instance = buildJobInstance(command, runMode);
+            JobInstance instance = buildJobInstance(command, runMode, jobMode);
 
             jobInstanceDao.insert(instance);
 
@@ -215,11 +216,16 @@ public class StreamingJobInstanceServiceImpl implements StreamingJobInstanceServ
         }
     }
 
+    @Override
+    public List<JobInstanceVO> listRunningStreamingInstances() {
+        return jobInstanceDao.listRunningByJobType(JobMode.STREAMING);
+    }
+
     private JobDefinitionSaveCommand loadDefinitionCommand(Long jobDefineId) {
         return streamingJobDefinitionCommandResolver.resolve(jobDefineId);
     }
 
-    private JobInstance buildJobInstance(JobDefinitionSaveCommand command, RunMode runMode) {
+    private JobInstance buildJobInstance(JobDefinitionSaveCommand command, RunMode runMode, JobMode jobMode) {
         Long id = generateInstanceId();
         String runtimeConfig = buildJobConfig(command);
 
@@ -228,7 +234,8 @@ public class StreamingJobInstanceServiceImpl implements StreamingJobInstanceServ
                 id,
                 runtimeConfig,
                 runMode,
-                buildLogPath(id)
+                buildLogPath(id),
+                jobMode
         );
     }
 

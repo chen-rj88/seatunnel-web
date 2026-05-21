@@ -1,5 +1,6 @@
 package org.apache.seatunnel.web.api.service;
 
+import org.apache.seatunnel.web.common.enums.JobMode;
 import org.apache.seatunnel.web.common.enums.RunMode;
 import org.apache.seatunnel.web.dao.entity.JobInstance;
 import org.apache.seatunnel.web.spi.bean.dto.SeaTunnelJobInstanceDTO;
@@ -11,7 +12,7 @@ import java.util.List;
 
 public interface StreamingJobInstanceService {
 
-    JobInstanceVO create(Long jobDefineId, RunMode runMode);
+    JobInstanceVO create(Long jobDefineId, RunMode runMode, JobMode jobMode);
 
     PaginationResult<JobInstanceVO> paging(SeaTunnelJobInstanceDTO dto);
 
@@ -26,4 +27,6 @@ public interface StreamingJobInstanceService {
     void updateById(JobInstance po);
 
     List<JobTableMetricsVO> listTableMetrics(Long instanceId);
+
+    List<JobInstanceVO> listRunningStreamingInstances();
 }

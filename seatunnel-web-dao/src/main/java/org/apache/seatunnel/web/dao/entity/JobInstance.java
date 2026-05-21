@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.*;
+import org.apache.seatunnel.web.common.enums.JobMode;
 import org.apache.seatunnel.web.common.enums.JobStatus;
 import org.apache.seatunnel.web.common.enums.RunMode;
 
@@ -29,6 +30,11 @@ public class JobInstance {
      * Run mode, such as MANUAL / SCHEDULE / RETRY
      */
     private RunMode runMode;
+
+    /**
+     * Job mode, such as BATCH / STREAMING
+     */
+    private JobMode jobMode;
 
     /**
      * Current job execution status

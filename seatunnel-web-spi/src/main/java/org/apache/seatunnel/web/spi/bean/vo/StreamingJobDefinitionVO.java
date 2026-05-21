@@ -6,6 +6,7 @@ import org.apache.seatunnel.web.common.enums.JobMode;
 import org.apache.seatunnel.web.common.enums.ReleaseState;
 
 import java.util.Date;
+import java.util.List;
 
 @Data
 public class StreamingJobDefinitionVO {
@@ -49,8 +50,6 @@ public class StreamingJobDefinitionVO {
 
     /**
      * 最近一次运行实例状态。
-     *
-     * INITIALIZING / CREATED / PENDING / RUNNING / FINISHED / FAILED / CANCELED ...
      */
     private String lastJobStatus;
 
@@ -78,4 +77,16 @@ public class StreamingJobDefinitionVO {
      * 最近一次错误信息。
      */
     private String lastErrorMessage;
+
+    /**
+     * 当前最新汇总指标。
+     *
+     */
+    private StreamingMetricsSnapshotVO latestMetrics;
+
+    /**
+     * 最近 20 条历史趋势指标。
+     *
+     */
+    private List<StreamingMetricsTrendItemVO> recentMetrics;
 }

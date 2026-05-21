@@ -7,6 +7,7 @@ import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.web.api.service.StreamingJobDefinitionService;
 import org.apache.seatunnel.web.api.service.StreamingJobInstanceService;
+import org.apache.seatunnel.web.api.service.StreamingJobMetricsService;
 import org.apache.seatunnel.web.common.enums.ReleaseState;
 import org.apache.seatunnel.web.common.utils.JSONUtils;
 import org.apache.seatunnel.web.core.exceptions.ServiceException;
@@ -26,11 +27,14 @@ import org.apache.seatunnel.web.spi.bean.dto.streaming.StreamingGuideSingleJobSa
 import org.apache.seatunnel.web.spi.bean.dto.streaming.StreamingScriptJobSaveCommand;
 import org.apache.seatunnel.web.spi.bean.entity.PaginationResult;
 import org.apache.seatunnel.web.spi.bean.vo.StreamingJobDefinitionVO;
+import org.apache.seatunnel.web.spi.bean.vo.StreamingMetricsSnapshotVO;
+import org.apache.seatunnel.web.spi.bean.vo.StreamingMetricsTrendItemVO;
 import org.apache.seatunnel.web.spi.enums.JobRuntimeType;
 import org.apache.seatunnel.web.spi.enums.Status;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -55,6 +59,9 @@ public class StreamingJobDefinitionServiceImpl extends BaseServiceImpl implement
 
     @Resource
     private StreamingJobInstanceService streamingJobInstanceService;
+
+    @Resource
+    private StreamingJobMetricsService streamingJobMetricsService;
 
     @Override
     public Long saveOrUpdate(StreamingScriptJobSaveCommand command) {
@@ -146,6 +153,8 @@ public class StreamingJobDefinitionServiceImpl extends BaseServiceImpl implement
             List<StreamingJobDefinitionVO> records =
                     streamingJobDefinitionDao.selectPage(dto, offset, dto.getPageSize());
 
+            enrichMetrics(records);
+
             Long total = streamingJobDefinitionDao.count(dto);
 
             return PaginationResult.buildSuc(records, dto.getPageNo(), dto.getPageSize(), total);
@@ -154,6 +163,38 @@ public class StreamingJobDefinitionServiceImpl extends BaseServiceImpl implement
         } catch (Exception e) {
             log.error("Query streaming job definition paging failed, dto={}", dto, e);
             throw new ServiceException(Status.QUERY_BATCH_JOB_DEFINITION_ERROR);
+        }
+    }
+
+    private void enrichMetrics(List<StreamingJobDefinitionVO> records) {
+        if (records == null || records.isEmpty()) {
+            return;
+        }
+
+        for (StreamingJobDefinitionVO record : records) {
+            Long instanceId = record.getInstanceId();
+            if (instanceId == null || instanceId <= 0) {
+                record.setLatestMetrics(null);
+                record.setRecentMetrics(Collections.emptyList());
+                continue;
+            }
+
+            try {
+                StreamingMetricsSnapshotVO latestMetrics =
+                        streamingJobMetricsService.latest(instanceId);
+
+                List<StreamingMetricsTrendItemVO> recentMetrics =
+                        streamingJobMetricsService.recentTrend(instanceId, 20);
+
+                record.setLatestMetrics(latestMetrics);
+                record.setRecentMetrics(recentMetrics == null ? Collections.emptyList() : recentMetrics);
+            } catch (Exception e) {
+                log.warn("Enrich streaming job metrics failed, definitionId={}, instanceId={}",
+                        record.getId(), instanceId, e);
+
+                record.setLatestMetrics(null);
+                record.setRecentMetrics(Collections.emptyList());
+            }
         }
     }
 
