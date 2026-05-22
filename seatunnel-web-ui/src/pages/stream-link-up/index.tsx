@@ -1,6 +1,6 @@
 import { Divider, message, Modal } from "antd";
 import moment from "moment";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { history } from "umi";
 
 import {
@@ -12,6 +12,7 @@ import RealtimeHeader from "./components/RealtimeHeader";
 import RealtimeTaskTable from "./components/RealtimeTaskTable";
 import SearchToolbar from "./components/SearchToolbar";
 import StreamingHelperSection from "./components/StreamingHelperSection";
+import RealtimeTaskViewModal from "./components/RealtimeTaskViewModal";
 
 const REALTIME_DETAIL_CACHE_PREFIX = "stream-link-up-detail";
 
@@ -164,6 +165,8 @@ const RealtimeSyncPage: React.FC = () => {
     connectorType: "Jdbc",
     pluginName: "JDBC-MYSQL",
   });
+
+  const ref = useRef(null);
 
   const [searchValues, setSearchValues] = useState<SearchValues>(() =>
     parseSearchParamsFromUrl()
@@ -372,7 +375,7 @@ const RealtimeSyncPage: React.FC = () => {
   };
 
   const handleView = (record: StreamingJobDefinitionVO) => {
-    history.push(`/sync/stream-link-up/${record.id}/detail?readonly=true`);
+    ref.current?.onOpen(true, record, () => {});
   };
 
   const handleEdit = async (record: StreamingJobDefinitionVO) => {
@@ -605,6 +608,7 @@ const RealtimeSyncPage: React.FC = () => {
   };
 
   return (
+    <>
     <div className="min-h-screen px-6 pb-24 pt-7 text-slate-950">
       <RealtimeHeader
         sourceType={sourceType}
@@ -660,6 +664,8 @@ const RealtimeSyncPage: React.FC = () => {
         onPageChange={handlePaginationChange}
       />
     </div>
+    <RealtimeTaskViewModal ref={ref}/></>
+    
   );
 };
 

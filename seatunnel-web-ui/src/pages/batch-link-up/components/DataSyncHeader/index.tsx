@@ -74,11 +74,7 @@ const DataSyncHeader: React.FC<DataSyncHeaderProps> = ({
 
       <div className="mb-5 rounded-[20px] border border-indigo-100 bg-white/90 p-4 ">
         <div className="mb-2 flex items-center gap-3 font-semibold text-slate-900 st-web-font">
-          Prod
-          {/* <span className="inline-flex h-6 items-center gap-2 rounded-full bg-indigo-50 px-3 text-xs font-semibold " style={{color: "rgb(64, 81, 181)"}}>
-            <i className="h-1.5 w-1.5 rounded-full bg-indigo-500 shadow-[0_0_0_4px_rgba(99,102,241,0.14)]" />
-            离线批量
-          </span> */}
+          同步方向
         </div>
 
         <div className="grid grid-cols-[minmax(240px,1fr)_120px_minmax(240px,1fr)_180px] items-center gap-4 max-xl:grid-cols-1">
