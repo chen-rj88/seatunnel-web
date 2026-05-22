@@ -11,18 +11,23 @@ import org.apache.seatunnel.web.api.metrics.streaming.parser.StreamingJobInfoMet
 import org.apache.seatunnel.web.api.service.StreamingJobMetricsService;
 import org.apache.seatunnel.web.core.exceptions.ServiceException;
 import org.apache.seatunnel.web.dao.entity.StreamingJobMetrics;
-import org.apache.seatunnel.web.dao.entity.StreamingJobTableMetrics;
+import org.apache.seatunnel.web.dao.entity.StreamingJobMetricsCurrent;
+import org.apache.seatunnel.web.dao.entity.StreamingJobTableMetricsCurrent;
+import org.apache.seatunnel.web.dao.repository.StreamingJobMetricsCurrentDao;
 import org.apache.seatunnel.web.dao.repository.StreamingJobMetricsDao;
-import org.apache.seatunnel.web.dao.repository.StreamingJobTableMetricsDao;
+import org.apache.seatunnel.web.dao.repository.StreamingJobTableMetricsCurrentDao;
 import org.apache.seatunnel.web.spi.bean.vo.StreamingMetricsSnapshotVO;
 import org.apache.seatunnel.web.spi.bean.vo.StreamingMetricsTrendItemVO;
 import org.apache.seatunnel.web.spi.bean.vo.StreamingMetricsTrendVO;
 import org.apache.seatunnel.web.spi.bean.vo.StreamingTableMetricsVO;
 import org.apache.seatunnel.web.spi.enums.Status;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -34,6 +39,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
@@ -59,11 +65,45 @@ public class StreamingJobMetricsServiceImpl implements StreamingJobMetricsServic
     @Resource
     private StreamingJobInfoMetricsParser streamingJobInfoMetricsParser;
 
+    /**
+     * 任务级趋势历史表 DAO。
+     *
+     * 对应：
+     * t_seatunnel_streaming_job_metrics
+     *
+     * 这里只保存采样后的历史趋势，不再每次都写。
+     */
     @Resource
     private StreamingJobMetricsDao streamingJobMetricsDao;
 
+    /**
+     * 实时任务最新汇总表 DAO。
+     *
+     * 对应：
+     * t_seatunnel_streaming_job_metrics_current
+     */
     @Resource
-    private StreamingJobTableMetricsDao streamingJobTableMetricsDao;
+    private StreamingJobMetricsCurrentDao streamingJobMetricsCurrentDao;
+
+    /**
+     * 实时任务表级最新明细表 DAO。
+     *
+     * 对应：
+     * t_seatunnel_streaming_job_table_metrics_current
+     */
+    @Resource
+    private StreamingJobTableMetricsCurrentDao streamingJobTableMetricsCurrentDao;
+
+    /**
+     * 趋势历史采样间隔。
+     *
+     * current 表每次采集都会 upsert。
+     * snapshot 历史表按这个间隔 insert。
+     */
+    @Value("${seatunnel.streaming.metrics.snapshot-interval-ms:60000}")
+    private long snapshotIntervalMs;
+
+    private final Map<Long, Long> lastSnapshotTimeMap = new ConcurrentHashMap<>();
 
     @Override
     public StreamingParsedJobMetrics getRealtimeMetricsFromEngine(Long clientId, Long engineJobId) {
@@ -74,6 +114,15 @@ public class StreamingJobMetricsServiceImpl implements StreamingJobMetricsServic
         return streamingJobInfoMetricsParser.parse(jobInfo);
     }
 
+    /**
+     * 方法名仍然保留 saveSnapshot，是为了兼容 StreamingJobMetricsMonitor 当前调用。
+     *
+     * 实际行为：
+     * 1. 每次采集 upsert 最新任务汇总；
+     * 2. 每次采集 upsert 最新表级明细；
+     * 3. 按 snapshotIntervalMs 采样写入任务级趋势历史；
+     * 4. 不再写入表级历史表。
+     */
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void saveSnapshot(Long jobInstanceId,
@@ -95,34 +144,47 @@ public class StreamingJobMetricsServiceImpl implements StreamingJobMetricsServic
         Date collectTime = new Date(collectTimeMs);
         Date now = new Date();
 
-        List<StreamingJobMetrics> pipelineList = buildPipelineMetrics(
+        StreamingJobMetricsCurrent current = buildCurrentMetrics(
                 jobInstanceId,
                 jobDefinitionId,
                 clientId,
                 engineJobId,
                 parsed,
                 collectTimeMs,
-                collectTime,
-                now
+                collectTime
         );
 
-        List<StreamingJobTableMetrics> tableList = buildTableMetrics(
+        streamingJobMetricsCurrentDao.upsert(current);
+
+        List<StreamingJobTableMetricsCurrent> tableCurrentList = buildTableCurrentMetrics(
                 jobInstanceId,
                 jobDefinitionId,
                 clientId,
                 engineJobId,
                 parsed,
                 collectTimeMs,
-                collectTime,
-                now
+                collectTime
         );
 
-        if (!pipelineList.isEmpty()) {
-            streamingJobMetricsDao.insertBatch(pipelineList);
+        if (!tableCurrentList.isEmpty()) {
+            streamingJobTableMetricsCurrentDao.upsertBatch(tableCurrentList);
         }
 
-        if (!tableList.isEmpty()) {
-            streamingJobTableMetricsDao.insertBatch(tableList);
+        if (shouldSaveSnapshot(jobInstanceId, collectTimeMs)) {
+            List<StreamingJobMetrics> pipelineMetrics = buildPipelineSnapshotMetrics(
+                    jobInstanceId,
+                    jobDefinitionId,
+                    clientId,
+                    engineJobId,
+                    parsed,
+                    collectTimeMs,
+                    collectTime,
+                    now
+            );
+
+            if (!pipelineMetrics.isEmpty()) {
+                streamingJobMetricsDao.insertBatch(pipelineMetrics);
+            }
         }
     }
 
@@ -130,31 +192,45 @@ public class StreamingJobMetricsServiceImpl implements StreamingJobMetricsServic
     public StreamingMetricsSnapshotVO latest(Long instanceId) {
         validatePositive(instanceId, "instanceId");
 
-        StreamingJobMetrics latest = streamingJobMetricsDao.selectLatestByInstanceId(instanceId);
-        List<StreamingJobTableMetrics> tableMetrics =
-                streamingJobTableMetricsDao.selectLatestByInstanceId(instanceId);
+        StreamingJobMetricsCurrent latest =
+                streamingJobMetricsCurrentDao.selectByInstanceId(instanceId);
+
+        List<StreamingJobTableMetricsCurrent> tableMetrics =
+                streamingJobTableMetricsCurrentDao.selectByInstanceId(instanceId);
 
         StreamingMetricsSnapshotVO vo = new StreamingMetricsSnapshotVO();
 
         if (latest != null) {
-            vo.setCollectTimeMs(latest.getCollectTimeMs());
+            vo.setCollectTimeMs(latest.getLastCollectTimeMs());
             vo.setJobInstanceId(latest.getJobInstanceId());
             vo.setJobDefinitionId(latest.getJobDefinitionId());
             vo.setEngineJobId(latest.getEngineJobId());
             vo.setClientId(latest.getClientId());
             vo.setJobStatus(latest.getJobStatus());
+
             vo.setReadRowCount(defaultLong(latest.getReadRowCount()));
             vo.setWriteRowCount(defaultLong(latest.getWriteRowCount()));
             vo.setReadQps(defaultDecimal(latest.getReadQps()));
             vo.setWriteQps(defaultDecimal(latest.getWriteQps()));
+
             vo.setReadBytes(defaultLong(latest.getReadBytes()));
             vo.setWriteBytes(defaultLong(latest.getWriteBytes()));
             vo.setReadBps(defaultDecimal(latest.getReadBps()));
             vo.setWriteBps(defaultDecimal(latest.getWriteBps()));
+
             vo.setIntermediateQueueSize(defaultLong(latest.getIntermediateQueueSize()));
+
+            /*
+             * 如果 StreamingMetricsSnapshotVO 已经加了这些字段，可以放开：
+             *
+             * vo.setLagCount(defaultLong(latest.getLagCount()));
+             * vo.setRecordDelay(defaultLong(latest.getRecordDelay()));
+             * vo.setPipelineCount(defaultInteger(latest.getPipelineCount()));
+             * vo.setTableCount(defaultInteger(latest.getTableCount()));
+             */
         }
 
-        vo.setTableMetrics(toTableVOList(tableMetrics));
+        vo.setTableMetrics(toCurrentTableVOList(tableMetrics));
         return vo;
     }
 
@@ -181,28 +257,91 @@ public class StreamingJobMetricsServiceImpl implements StreamingJobMetricsServic
     }
 
     @Override
-    public List<StreamingTableMetricsVO> listLatestTableMetrics(Long instanceId) {
+    public List<StreamingMetricsTrendItemVO> recentTrend(Long instanceId, Integer limit) {
         validatePositive(instanceId, "instanceId");
-        return toTableVOList(streamingJobTableMetricsDao.selectLatestByInstanceId(instanceId));
+
+        List<StreamingJobMetrics> rows =
+                streamingJobMetricsDao.selectRecentByInstanceId(instanceId, limit);
+
+        return toTrendItems(rows);
+    }
+
+    private List<StreamingMetricsTrendItemVO> toTrendItems(List<StreamingJobMetrics> rows) {
+        if (rows == null || rows.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<StreamingMetricsTrendItemVO> result = new ArrayList<>();
+
+        for (StreamingJobMetrics item : rows) {
+            StreamingMetricsTrendItemVO vo = new StreamingMetricsTrendItemVO();
+
+            vo.setDate(formatTime(item.getCollectTimeMs()));
+
+            vo.setReadRowCount(defaultLong(item.getReadRowCount()));
+            vo.setWriteRowCount(defaultLong(item.getWriteRowCount()));
+
+            vo.setReadBytes(defaultLong(item.getReadBytes()));
+            vo.setWriteBytes(defaultLong(item.getWriteBytes()));
+
+            vo.setIntermediateQueueSize(defaultLong(item.getIntermediateQueueSize()));
+
+            vo.setReadQps(defaultDecimal(item.getReadQps()));
+            vo.setWriteQps(defaultDecimal(item.getWriteQps()));
+
+            vo.setReadBps(defaultDecimal(item.getReadBps()));
+            vo.setWriteBps(defaultDecimal(item.getWriteBps()));
+
+            result.add(vo);
+        }
+
+        return result;
+    }
+
+    private String formatTime(Long collectTimeMs) {
+        long timestamp = collectTimeMs == null ? System.currentTimeMillis() : collectTimeMs;
+
+        LocalDateTime time = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(timestamp),
+                ZONE_ID
+        );
+
+        return time.format(SECOND_FORMATTER);
     }
 
     @Override
+    public List<StreamingTableMetricsVO> listLatestTableMetrics(Long instanceId) {
+        validatePositive(instanceId, "instanceId");
+
+        List<StreamingJobTableMetricsCurrent> rows =
+                streamingJobTableMetricsCurrentDao.selectByInstanceId(instanceId);
+
+        return toCurrentTableVOList(rows);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteByInstanceId(Long instanceId) {
         if (instanceId == null) {
             return;
         }
 
-        streamingJobTableMetricsDao.deleteByInstanceId(instanceId);
+        streamingJobTableMetricsCurrentDao.deleteByInstanceId(instanceId);
+        streamingJobMetricsCurrentDao.deleteByInstanceId(instanceId);
         streamingJobMetricsDao.deleteByInstanceId(instanceId);
+
+        lastSnapshotTimeMap.remove(instanceId);
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteByDefinitionId(Long definitionId) {
         if (definitionId == null) {
             return;
         }
 
-        streamingJobTableMetricsDao.deleteByDefinitionId(definitionId);
+        streamingJobTableMetricsCurrentDao.deleteByDefinitionId(definitionId);
+        streamingJobMetricsCurrentDao.deleteByDefinitionId(definitionId);
         streamingJobMetricsDao.deleteByDefinitionId(definitionId);
     }
 
@@ -214,8 +353,199 @@ public class StreamingJobMetricsServiceImpl implements StreamingJobMetricsServic
 
         long before = System.currentTimeMillis() - Duration.ofDays(retentionDays).toMillis();
 
-        streamingJobTableMetricsDao.deleteBefore(before);
+        /*
+         * current 表代表最新状态，不按过期时间删除。
+         * 这里只清理任务级趋势历史。
+         */
         streamingJobMetricsDao.deleteBefore(before);
+    }
+
+    private StreamingJobMetricsCurrent buildCurrentMetrics(Long jobInstanceId,
+                                                           Long jobDefinitionId,
+                                                           Long clientId,
+                                                           Long engineJobId,
+                                                           StreamingParsedJobMetrics parsed,
+                                                           Long collectTimeMs,
+                                                           Date collectTime) {
+        StreamingJobMetricsCurrent current = new StreamingJobMetricsCurrent();
+
+        current.setJobInstanceId(jobInstanceId);
+        current.setJobDefinitionId(jobDefinitionId);
+        current.setClientId(clientId);
+        current.setEngineJobId(engineJobId);
+        current.setJobStatus(parsed.getJobStatus());
+
+        long readRowCount = 0L;
+        long writeRowCount = 0L;
+        long readBytes = 0L;
+        long writeBytes = 0L;
+        long intermediateQueueSize = 0L;
+        long lagCount = 0L;
+        long recordDelay = 0L;
+
+        BigDecimal readQps = BigDecimal.ZERO;
+        BigDecimal writeQps = BigDecimal.ZERO;
+        BigDecimal readBps = BigDecimal.ZERO;
+        BigDecimal writeBps = BigDecimal.ZERO;
+
+        if (parsed.getPipelineMetrics() != null && !parsed.getPipelineMetrics().isEmpty()) {
+            for (StreamingPipelineMetrics item : parsed.getPipelineMetrics().values()) {
+                readRowCount += defaultLong(item.getReadRowCount());
+                writeRowCount += defaultLong(item.getWriteRowCount());
+
+                readBytes += defaultLong(item.getReadBytes());
+                writeBytes += defaultLong(item.getWriteBytes());
+
+                intermediateQueueSize += defaultLong(item.getIntermediateQueueSize());
+                lagCount += defaultLong(item.getLagCount());
+
+                /*
+                 * 延迟类指标取最大值更直观。
+                 */
+                recordDelay = Math.max(recordDelay, defaultLong(item.getRecordDelay()));
+
+                readQps = readQps.add(defaultDecimal(item.getReadQps()));
+                writeQps = writeQps.add(defaultDecimal(item.getWriteQps()));
+
+                readBps = readBps.add(defaultDecimal(item.getReadBps()));
+                writeBps = writeBps.add(defaultDecimal(item.getWriteBps()));
+            }
+        }
+
+        current.setReadRowCount(readRowCount);
+        current.setWriteRowCount(writeRowCount);
+
+        current.setReadQps(readQps);
+        current.setWriteQps(writeQps);
+
+        current.setReadBytes(readBytes);
+        current.setWriteBytes(writeBytes);
+
+        current.setReadBps(readBps);
+        current.setWriteBps(writeBps);
+
+        current.setIntermediateQueueSize(intermediateQueueSize);
+        current.setLagCount(lagCount);
+        current.setRecordDelay(recordDelay);
+
+        current.setPipelineCount(
+                parsed.getPipelineMetrics() == null ? 0 : parsed.getPipelineMetrics().size()
+        );
+        current.setTableCount(
+                parsed.getTableMetrics() == null ? 0 : parsed.getTableMetrics().size()
+        );
+
+        current.setLastCollectTimeMs(collectTimeMs);
+        current.setLastCollectTime(collectTime);
+
+        return current;
+    }
+
+    private List<StreamingJobTableMetricsCurrent> buildTableCurrentMetrics(Long jobInstanceId,
+                                                                           Long jobDefinitionId,
+                                                                           Long clientId,
+                                                                           Long engineJobId,
+                                                                           StreamingParsedJobMetrics parsed,
+                                                                           Long collectTimeMs,
+                                                                           Date collectTime) {
+        if (parsed.getTableMetrics() == null || parsed.getTableMetrics().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<StreamingJobTableMetricsCurrent> result = new ArrayList<>();
+
+        for (StreamingTableMetrics item : parsed.getTableMetrics()) {
+            StreamingJobTableMetricsCurrent po = new StreamingJobTableMetricsCurrent();
+
+            String tableKey = buildTableKey(
+                    item.getSourceTable(),
+                    item.getSinkTable(),
+                    item.getTableKey()
+            );
+
+            po.setJobInstanceId(jobInstanceId);
+            po.setJobDefinitionId(jobDefinitionId);
+            po.setClientId(clientId);
+            po.setEngineJobId(engineJobId);
+            po.setPipelineId(defaultPipelineId(item.getPipelineId()));
+
+            po.setSourceTable(item.getSourceTable());
+            po.setSinkTable(item.getSinkTable());
+            po.setTableKey(tableKey);
+            po.setTableKeyHash(md5Hex(tableKey));
+
+            po.setReadRowCount(defaultLong(item.getReadRowCount()));
+            po.setWriteRowCount(defaultLong(item.getWriteRowCount()));
+
+            po.setReadQps(defaultDecimal(item.getReadQps()));
+            po.setWriteQps(defaultDecimal(item.getWriteQps()));
+
+            po.setReadBytes(defaultLong(item.getReadBytes()));
+            po.setWriteBytes(defaultLong(item.getWriteBytes()));
+
+            po.setReadBps(defaultDecimal(item.getReadBps()));
+            po.setWriteBps(defaultDecimal(item.getWriteBps()));
+
+            po.setStatus(item.getStatus());
+            po.setErrorMsg(item.getErrorMsg());
+
+            po.setLastCollectTimeMs(collectTimeMs);
+            po.setLastCollectTime(collectTime);
+
+            result.add(po);
+        }
+
+        return result;
+    }
+
+    private List<StreamingJobMetrics> buildPipelineSnapshotMetrics(Long jobInstanceId,
+                                                                   Long jobDefinitionId,
+                                                                   Long clientId,
+                                                                   Long engineJobId,
+                                                                   StreamingParsedJobMetrics parsed,
+                                                                   Long collectTimeMs,
+                                                                   Date collectTime,
+                                                                   Date now) {
+        if (parsed.getPipelineMetrics() == null || parsed.getPipelineMetrics().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<StreamingJobMetrics> result = new ArrayList<>();
+
+        for (StreamingPipelineMetrics item : parsed.getPipelineMetrics().values()) {
+            StreamingJobMetrics po = new StreamingJobMetrics();
+
+            po.setCollectTimeMs(collectTimeMs);
+            po.setJobInstanceId(jobInstanceId);
+            po.setJobDefinitionId(jobDefinitionId);
+            po.setClientId(clientId);
+            po.setEngineJobId(engineJobId);
+            po.setPipelineId(defaultPipelineId(item.getPipelineId()));
+            po.setJobStatus(parsed.getJobStatus());
+
+            po.setReadRowCount(defaultLong(item.getReadRowCount()));
+            po.setWriteRowCount(defaultLong(item.getWriteRowCount()));
+
+            po.setReadQps(defaultDecimal(item.getReadQps()));
+            po.setWriteQps(defaultDecimal(item.getWriteQps()));
+
+            po.setReadBytes(defaultLong(item.getReadBytes()));
+            po.setWriteBytes(defaultLong(item.getWriteBytes()));
+
+            po.setReadBps(defaultDecimal(item.getReadBps()));
+            po.setWriteBps(defaultDecimal(item.getWriteBps()));
+
+            po.setIntermediateQueueSize(defaultLong(item.getIntermediateQueueSize()));
+            po.setLagCount(defaultLong(item.getLagCount()));
+            po.setRecordDelay(defaultLong(item.getRecordDelay()));
+
+            po.setCollectTime(collectTime);
+            po.setCreateTime(now);
+
+            result.add(po);
+        }
+
+        return result;
     }
 
     private List<StreamingMetricsTrendItemVO> buildTrendItems(List<StreamingJobMetrics> rows,
@@ -248,17 +578,28 @@ public class StreamingJobMetricsServiceImpl implements StreamingJobMetricsServic
             BigDecimal writeBps = BigDecimal.ZERO;
 
             for (StreamingJobMetrics item : bucketRows) {
+                /*
+                 * row count / bytes 一般是累计值。
+                 * 同一个时间桶内取最大值。
+                 */
                 readRowCount = Math.max(readRowCount, defaultLong(item.getReadRowCount()));
                 writeRowCount = Math.max(writeRowCount, defaultLong(item.getWriteRowCount()));
+
                 readBytes = Math.max(readBytes, defaultLong(item.getReadBytes()));
                 writeBytes = Math.max(writeBytes, defaultLong(item.getWriteBytes()));
+
                 intermediateQueueSize = Math.max(
                         intermediateQueueSize,
                         defaultLong(item.getIntermediateQueueSize())
                 );
 
+                /*
+                 * qps / bps 是速率值。
+                 * 同一个时间桶内取平均值。
+                 */
                 readQps = readQps.add(defaultDecimal(item.getReadQps()));
                 writeQps = writeQps.add(defaultDecimal(item.getWriteQps()));
+
                 readBps = readBps.add(defaultDecimal(item.getReadBps()));
                 writeBps = writeBps.add(defaultDecimal(item.getWriteBps()));
             }
@@ -267,20 +608,85 @@ public class StreamingJobMetricsServiceImpl implements StreamingJobMetricsServic
 
             StreamingMetricsTrendItemVO vo = new StreamingMetricsTrendItemVO();
             vo.setDate(entry.getKey());
+
             vo.setReadRowCount(readRowCount);
             vo.setWriteRowCount(writeRowCount);
+
             vo.setReadBytes(readBytes);
             vo.setWriteBytes(writeBytes);
+
             vo.setIntermediateQueueSize(intermediateQueueSize);
-            vo.setReadQps(readQps.divide(bucketSize, 4));
-            vo.setWriteQps(writeQps.divide(bucketSize, 4));
-            vo.setReadBps(readBps.divide(bucketSize, 4));
-            vo.setWriteBps(writeBps.divide(bucketSize, 4));
+
+            vo.setReadQps(divide(readQps, bucketSize));
+            vo.setWriteQps(divide(writeQps, bucketSize));
+
+            vo.setReadBps(divide(readBps, bucketSize));
+            vo.setWriteBps(divide(writeBps, bucketSize));
 
             result.add(vo);
         }
 
         return result;
+    }
+
+    private List<StreamingTableMetricsVO> toCurrentTableVOList(List<StreamingJobTableMetricsCurrent> list) {
+        if (list == null || list.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<StreamingTableMetricsVO> result = new ArrayList<>();
+
+        for (StreamingJobTableMetricsCurrent item : list) {
+            StreamingTableMetricsVO vo = new StreamingTableMetricsVO();
+
+            vo.setCollectTimeMs(item.getLastCollectTimeMs());
+            vo.setJobInstanceId(item.getJobInstanceId());
+            vo.setJobDefinitionId(item.getJobDefinitionId());
+            vo.setEngineJobId(item.getEngineJobId());
+            vo.setClientId(item.getClientId());
+            vo.setPipelineId(item.getPipelineId());
+
+            vo.setSourceTable(item.getSourceTable());
+            vo.setSinkTable(item.getSinkTable());
+            vo.setTableKey(item.getTableKey());
+
+            vo.setReadRowCount(defaultLong(item.getReadRowCount()));
+            vo.setWriteRowCount(defaultLong(item.getWriteRowCount()));
+
+            vo.setReadQps(defaultDecimal(item.getReadQps()));
+            vo.setWriteQps(defaultDecimal(item.getWriteQps()));
+
+            vo.setReadBytes(defaultLong(item.getReadBytes()));
+            vo.setWriteBytes(defaultLong(item.getWriteBytes()));
+
+            vo.setReadBps(defaultDecimal(item.getReadBps()));
+            vo.setWriteBps(defaultDecimal(item.getWriteBps()));
+
+            vo.setStatus(item.getStatus());
+            vo.setErrorMsg(item.getErrorMsg());
+
+            result.add(vo);
+        }
+
+        return result;
+    }
+
+    private boolean shouldSaveSnapshot(Long instanceId, Long collectTimeMs) {
+        if (instanceId == null || collectTimeMs == null) {
+            return false;
+        }
+
+        if (snapshotIntervalMs <= 0) {
+            return false;
+        }
+
+        Long lastTime = lastSnapshotTimeMap.get(instanceId);
+        if (lastTime == null || collectTimeMs - lastTime >= snapshotIntervalMs) {
+            lastSnapshotTimeMap.put(instanceId, collectTimeMs);
+            return true;
+        }
+
+        return false;
     }
 
     private String buildBucket(Long collectTimeMs, String granularity) {
@@ -308,170 +714,30 @@ public class StreamingJobMetricsServiceImpl implements StreamingJobMetricsServic
         return time.format(MINUTE_FORMATTER);
     }
 
-    private List<StreamingJobMetrics> buildPipelineMetrics(Long jobInstanceId,
-                                                           Long jobDefinitionId,
-                                                           Long clientId,
-                                                           Long engineJobId,
-                                                           StreamingParsedJobMetrics parsed,
-                                                           Long collectTimeMs,
-                                                           Date collectTime,
-                                                           Date now) {
-        if (parsed.getPipelineMetrics() == null || parsed.getPipelineMetrics().isEmpty()) {
-            return Collections.emptyList();
+    private String buildTableKey(String sourceTable, String sinkTable, String tableKey) {
+        if (tableKey != null && !tableKey.isBlank()) {
+            return tableKey;
         }
 
-        List<StreamingJobMetrics> result = new ArrayList<>();
-
-        for (StreamingPipelineMetrics item : parsed.getPipelineMetrics().values()) {
-            StreamingJobMetrics po = new StreamingJobMetrics();
-
-            po.setCollectTimeMs(collectTimeMs);
-            po.setJobInstanceId(jobInstanceId);
-            po.setJobDefinitionId(jobDefinitionId);
-            po.setClientId(clientId);
-            po.setEngineJobId(engineJobId);
-            po.setPipelineId(defaultPipelineId(item.getPipelineId()));
-            po.setJobStatus(parsed.getJobStatus());
-
-            po.setReadRowCount(defaultLong(item.getReadRowCount()));
-            po.setWriteRowCount(defaultLong(item.getWriteRowCount()));
-            po.setReadQps(defaultDecimal(item.getReadQps()));
-            po.setWriteQps(defaultDecimal(item.getWriteQps()));
-
-            po.setReadBytes(defaultLong(item.getReadBytes()));
-            po.setWriteBytes(defaultLong(item.getWriteBytes()));
-            po.setReadBps(defaultDecimal(item.getReadBps()));
-            po.setWriteBps(defaultDecimal(item.getWriteBps()));
-
-            po.setIntermediateQueueSize(defaultLong(item.getIntermediateQueueSize()));
-            po.setLagCount(defaultLong(item.getLagCount()));
-            po.setRecordDelay(defaultLong(item.getRecordDelay()));
-
-            po.setCollectTime(collectTime);
-            po.setCreateTime(now);
-
-            result.add(po);
-        }
-
-        return result;
-    }
-
-    private List<StreamingJobTableMetrics> buildTableMetrics(Long jobInstanceId,
-                                                             Long jobDefinitionId,
-                                                             Long clientId,
-                                                             Long engineJobId,
-                                                             StreamingParsedJobMetrics parsed,
-                                                             Long collectTimeMs,
-                                                             Date collectTime,
-                                                             Date now) {
-        if (parsed.getTableMetrics() == null || parsed.getTableMetrics().isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<StreamingJobTableMetrics> result = new ArrayList<>();
-
-        for (StreamingTableMetrics item : parsed.getTableMetrics()) {
-            StreamingJobTableMetrics po = new StreamingJobTableMetrics();
-            String tableKey = buildTableKey(
-                    item.getSourceTable(),
-                    item.getSinkTable(),
-                    item.getTableKey()
-            );
-
-            po.setCollectTimeMs(collectTimeMs);
-            po.setJobInstanceId(jobInstanceId);
-            po.setJobDefinitionId(jobDefinitionId);
-            po.setClientId(clientId);
-            po.setEngineJobId(engineJobId);
-            po.setPipelineId(defaultPipelineId(item.getPipelineId()));
-
-            po.setSourceTable(item.getSourceTable());
-            po.setSinkTable(item.getSinkTable());
-            po.setTableKey(buildTableKey(item.getSourceTable(), item.getSinkTable(), item.getTableKey()));
-
-            po.setReadRowCount(defaultLong(item.getReadRowCount()));
-            po.setWriteRowCount(defaultLong(item.getWriteRowCount()));
-            po.setReadQps(defaultDecimal(item.getReadQps()));
-            po.setWriteQps(defaultDecimal(item.getWriteQps()));
-
-            po.setReadBytes(defaultLong(item.getReadBytes()));
-            po.setWriteBytes(defaultLong(item.getWriteBytes()));
-            po.setReadBps(defaultDecimal(item.getReadBps()));
-            po.setWriteBps(defaultDecimal(item.getWriteBps()));
-
-            po.setStatus(item.getStatus());
-            po.setErrorMsg(item.getErrorMsg());
-
-            po.setCollectTime(collectTime);
-            po.setCreateTime(now);
-
-            po.setTableKey(tableKey);
-            po.setTableKeyHash(md5Hex(tableKey));
-
-            result.add(po);
-        }
-
-        return result;
+        return safe(sourceTable) + "->" + safe(sinkTable);
     }
 
     private String md5Hex(String value) {
         try {
-            java.security.MessageDigest md = java.security.MessageDigest.getInstance("MD5");
-            byte[] digest = md.digest((value == null ? "" : value).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] digest = md.digest(
+                    (value == null ? "" : value).getBytes(StandardCharsets.UTF_8)
+            );
 
             StringBuilder sb = new StringBuilder();
             for (byte b : digest) {
                 sb.append(String.format("%02x", b));
             }
+
             return sb.toString();
         } catch (Exception e) {
             throw new IllegalStateException("Generate tableKey hash failed", e);
         }
-    }
-
-    private List<StreamingTableMetricsVO> toTableVOList(List<StreamingJobTableMetrics> list) {
-        if (list == null || list.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        List<StreamingTableMetricsVO> result = new ArrayList<>();
-
-        for (StreamingJobTableMetrics item : list) {
-            StreamingTableMetricsVO vo = new StreamingTableMetricsVO();
-            vo.setCollectTimeMs(item.getCollectTimeMs());
-            vo.setJobInstanceId(item.getJobInstanceId());
-            vo.setJobDefinitionId(item.getJobDefinitionId());
-            vo.setEngineJobId(item.getEngineJobId());
-            vo.setClientId(item.getClientId());
-            vo.setPipelineId(item.getPipelineId());
-
-            vo.setSourceTable(item.getSourceTable());
-            vo.setSinkTable(item.getSinkTable());
-            vo.setTableKey(item.getTableKey());
-
-            vo.setReadRowCount(defaultLong(item.getReadRowCount()));
-            vo.setWriteRowCount(defaultLong(item.getWriteRowCount()));
-            vo.setReadQps(defaultDecimal(item.getReadQps()));
-            vo.setWriteQps(defaultDecimal(item.getWriteQps()));
-            vo.setReadBytes(defaultLong(item.getReadBytes()));
-            vo.setWriteBytes(defaultLong(item.getWriteBytes()));
-            vo.setReadBps(defaultDecimal(item.getReadBps()));
-            vo.setWriteBps(defaultDecimal(item.getWriteBps()));
-
-            vo.setStatus(item.getStatus());
-            vo.setErrorMsg(item.getErrorMsg());
-
-            result.add(vo);
-        }
-
-        return result;
-    }
-
-    private String buildTableKey(String sourceTable, String sinkTable, String tableKey) {
-        if (tableKey != null && !tableKey.isBlank()) {
-            return tableKey;
-        }
-        return safe(sourceTable) + "->" + safe(sinkTable);
     }
 
     private int defaultPipelineId(Integer pipelineId) {
@@ -482,50 +748,33 @@ public class StreamingJobMetricsServiceImpl implements StreamingJobMetricsServic
         return value == null ? 0L : value;
     }
 
+    private Integer defaultInteger(Integer value) {
+        return value == null ? 0 : value;
+    }
+
     private BigDecimal defaultDecimal(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
     }
 
+    private BigDecimal divide(BigDecimal value, BigDecimal divisor) {
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+
+        if (divisor == null || BigDecimal.ZERO.compareTo(divisor) == 0) {
+            return BigDecimal.ZERO;
+        }
+
+        return value.divide(divisor, 4);
+    }
+
     private String safe(String value) {
-        return value == null ? "-" : value;
+        return value == null || value.isBlank() ? "-" : value;
     }
 
     private void validatePositive(Long value, String name) {
         if (value == null || value <= 0) {
             throw new ServiceException(Status.REQUEST_PARAMS_NOT_VALID_ERROR, name);
-        }
-    }
-
-    private Long toLong(Object value) {
-        if (value == null) {
-            return 0L;
-        }
-
-        try {
-            if (value instanceof Number) {
-                return ((Number) value).longValue();
-            }
-            return new BigDecimal(String.valueOf(value)).longValue();
-        } catch (Exception e) {
-            return 0L;
-        }
-    }
-
-    private BigDecimal toDecimal(Object value) {
-        if (value == null) {
-            return BigDecimal.ZERO;
-        }
-
-        try {
-            if (value instanceof BigDecimal) {
-                return (BigDecimal) value;
-            }
-            if (value instanceof Number) {
-                return BigDecimal.valueOf(((Number) value).doubleValue());
-            }
-            return new BigDecimal(String.valueOf(value));
-        } catch (Exception e) {
-            return BigDecimal.ZERO;
         }
     }
 }

@@ -7,12 +7,8 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
-@TableName("t_seatunnel_streaming_job_table_metrics")
-public class StreamingJobTableMetrics {
-
-    private String tableKeyHash;
-
-    private Long collectTimeMs;
+@TableName("t_seatunnel_streaming_job_table_metrics_current")
+public class StreamingJobTableMetricsCurrent {
 
     private Long jobInstanceId;
 
@@ -29,6 +25,8 @@ public class StreamingJobTableMetrics {
     private String sinkTable;
 
     private String tableKey;
+
+    private String tableKeyHash;
 
     private Long readRowCount;
 
@@ -50,7 +48,11 @@ public class StreamingJobTableMetrics {
 
     private String errorMsg;
 
-    private Date collectTime;
+    private Long lastCollectTimeMs;
+
+    private Date lastCollectTime;
 
     private Date createTime;
+
+    private Date updateTime;
 }

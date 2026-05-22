@@ -8,6 +8,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.web.api.service.BatchJobInstanceService;
 import org.apache.seatunnel.web.api.service.support.JobInstanceFactory;
 import org.apache.seatunnel.web.api.utils.HoconSensitiveMaskUtil;
+import org.apache.seatunnel.web.common.enums.JobMode;
 import org.apache.seatunnel.web.common.enums.RunMode;
 import org.apache.seatunnel.web.common.utils.CodeGenerateUtils;
 import org.apache.seatunnel.web.common.utils.ConvertUtil;
@@ -255,7 +256,8 @@ public class BatchJobInstanceServiceImpl implements BatchJobInstanceService {
                 id,
                 runtimeConfig,
                 runMode,
-                buildLogPath(id)
+                buildLogPath(id),
+                JobMode.BATCH
         );
     }
 

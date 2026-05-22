@@ -2,6 +2,7 @@ package org.apache.seatunnel.web.api.service;
 
 import org.apache.seatunnel.web.api.metrics.streaming.model.StreamingParsedJobMetrics;
 import org.apache.seatunnel.web.spi.bean.vo.StreamingMetricsSnapshotVO;
+import org.apache.seatunnel.web.spi.bean.vo.StreamingMetricsTrendItemVO;
 import org.apache.seatunnel.web.spi.bean.vo.StreamingMetricsTrendVO;
 import org.apache.seatunnel.web.spi.bean.vo.StreamingTableMetricsVO;
 
@@ -23,6 +24,8 @@ public interface StreamingJobMetricsService {
                                   Long startTimeMs,
                                   Long endTimeMs,
                                   String granularity);
+
+    List<StreamingMetricsTrendItemVO> recentTrend(Long instanceId, Integer limit);
 
     List<StreamingTableMetricsVO> listLatestTableMetrics(Long instanceId);
 

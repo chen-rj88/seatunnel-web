@@ -1,5 +1,6 @@
 package org.apache.seatunnel.web.api.metrics.streaming;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
@@ -9,6 +10,7 @@ import org.apache.seatunnel.web.api.metrics.streaming.model.StreamingParsedJobMe
 import org.apache.seatunnel.web.api.service.StreamingJobInstanceService;
 import org.apache.seatunnel.web.api.service.StreamingJobMetricsService;
 import org.apache.seatunnel.web.api.websocket.WorkflowWebSocketService;
+import org.apache.seatunnel.web.common.enums.JobMode;
 import org.apache.seatunnel.web.spi.bean.vo.JobInstanceVO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -46,6 +49,50 @@ public class StreamingJobMetricsMonitor {
 
     @Resource
     private WorkflowWebSocketService webSocketService;
+
+    @PostConstruct
+    public void restoreRunningStreamingJobs() {
+        try {
+            List<JobInstanceVO> runningInstances =
+                    streamingJobInstanceService.listRunningStreamingInstances();
+
+            if (runningInstances == null || runningInstances.isEmpty()) {
+                log.info("No running streaming jobs need to restore metrics monitor.");
+                return;
+            }
+
+            for (JobInstanceVO instance : runningInstances) {
+                if (instance.getId() == null
+                        || instance.getJobDefinitionId() == null
+                        || instance.getClientId() == null
+                        || instance.getEngineJobId() == null) {
+                    log.warn(
+                            "Skip restore streaming metrics monitor because required field is missing, instance={}",
+                            instance
+                    );
+                    continue;
+                }
+
+                JobRuntimeContext context = new JobRuntimeContext();
+                context.setInstanceId(instance.getId());
+                context.setJobDefinitionId(instance.getJobDefinitionId());
+                context.setClientId(instance.getClientId());
+                context.setEngineId(instance.getEngineJobId());
+                context.setJobType(JobMode.STREAMING.getCode());
+
+                register(context);
+
+                log.info(
+                        "Restore streaming metrics monitor success, instanceId={}, engineJobId={}",
+                        instance.getId(),
+                        instance.getEngineJobId()
+                );
+            }
+        } catch (Exception e) {
+            log.error("Restore running streaming metrics monitor failed.", e);
+        }
+    }
+
 
     public void register(JobRuntimeContext context) {
         if (context == null || context.getInstanceId() == null) {

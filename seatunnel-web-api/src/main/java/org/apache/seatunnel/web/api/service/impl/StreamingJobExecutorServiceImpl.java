@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.seatunnel.web.api.metrics.JobSubmitter;
 import org.apache.seatunnel.web.api.service.StreamingJobExecutorService;
 import org.apache.seatunnel.web.api.service.StreamingJobInstanceService;
+import org.apache.seatunnel.web.common.enums.JobMode;
 import org.apache.seatunnel.web.common.enums.JobStatus;
 import org.apache.seatunnel.web.common.enums.ReleaseState;
 import org.apache.seatunnel.web.common.enums.RunMode;
@@ -45,7 +46,7 @@ public class StreamingJobExecutorServiceImpl implements StreamingJobExecutorServ
             );
         }
 
-        JobInstanceVO instance = streamingJobInstanceService.create(jobDefineId, runMode);
+        JobInstanceVO instance = streamingJobInstanceService.create(jobDefineId, runMode, JobMode.STREAMING);
 
         log.info("Streaming job execute requested: jobDefineId={}, runMode={}, instanceId={}",
                 jobDefineId, runMode, instance.getId());

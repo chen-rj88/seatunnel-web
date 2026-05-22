@@ -65,6 +65,29 @@ public class StreamingJobMetricsDaoImpl
     }
 
     @Override
+    public List<StreamingJobMetrics> selectRecentByInstanceId(Long instanceId, Integer limit) {
+        if (instanceId == null || instanceId <= 0) {
+            return Collections.emptyList();
+        }
+
+        int finalLimit = limit == null || limit <= 0 ? 20 : Math.min(limit, 200);
+
+        List<StreamingJobMetrics> rows = streamingJobMetricsMapper.selectList(
+                new LambdaQueryWrapper<StreamingJobMetrics>()
+                        .eq(StreamingJobMetrics::getJobInstanceId, instanceId)
+                        .orderByDesc(StreamingJobMetrics::getCollectTimeMs)
+                        .orderByAsc(StreamingJobMetrics::getPipelineId)
+                        .last("LIMIT " + finalLimit)
+        );
+
+        if (rows == null || rows.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Collections.reverse(rows);
+        return rows;
+    }
+    @Override
     public void deleteByInstanceId(Long instanceId) {
         if (instanceId == null || instanceId <= 0) {
             return;
