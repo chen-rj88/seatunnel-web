@@ -105,10 +105,7 @@ const ExecutionStatus: React.FC<ExecutionStatusProps> = ({ record }) => {
   return (
     <div className="space-y-0.5">
       <MetricRow
-        label={intl.formatMessage({
-          id: "pages.job.execution.time",
-          defaultMessage: "Time:",
-        })}
+        label="已运行:"
         value={formatDuration(durationSeconds)}
       />
 

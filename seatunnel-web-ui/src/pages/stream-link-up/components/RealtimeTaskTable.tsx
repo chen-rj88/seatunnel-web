@@ -2,13 +2,13 @@ import { Empty, Table, Tooltip } from "antd";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 import React from "react";
 
-import TaskStatus from "@/pages/batch-link-up/components/SyncTaskList/components/TaskStatus";
 import ExecutionStatus from "./ExecutionStatus";
 import RealtimeMetricsTrend from "./RealtimeMetricsTrend";
 import RealtimeSyncPlan from "./RealtimeSyncPlan";
 import RealtimeTaskActionColumn, {
   StreamingJobDefinitionVO,
 } from "./RealtimeTaskActionColumn";
+import TaskStatus from "./TaskStatus";
 
 interface RealtimeTaskTableProps {
   loading?: boolean;
@@ -85,12 +85,14 @@ const RealtimeTaskTable: React.FC<RealtimeTaskTableProps> = ({
     {
       title: "状态",
       dataIndex: "taskParams",
-      width: "8%",
+      width: "96",
       render: (_content: any, record: any) => (
-        <TaskStatus
-          status={record?.lastJobStatus}
-          errorMessage={record?.lastErrorMessage}
-        />
+        <div className="flex w-full justify-center">
+          <TaskStatus
+            status={record?.lastJobStatus}
+            errorMessage={record?.lastErrorMessage}
+          />
+        </div>
       ),
     },
     {
