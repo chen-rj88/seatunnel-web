@@ -23,7 +23,7 @@ public class MysqlCdcSourceBuilder extends AbstractCdcSourceBuilder {
                 + "    table-names = [\"demo.user\"]\n"
                 + "    server-id = \"5400-5408\"\n"
                 + "    server-time-zone = \"Asia/Shanghai\"\n"
-                + "    startup.mode = \"initial\"\n"
+                + "    startup.mode = \"initial\"AbstractCdcSourceBuilder\n"
                 + "  }\n";
     }
 }

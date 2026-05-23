@@ -14,6 +14,7 @@ import {
   DEFAULT_FORM_VALUES,
 } from "../config";
 import { DbTypeValue, RightPanelTab, TableItem } from "../types";
+import { seatunnelStremJobDefinitionApi } from "@/pages/stream-link-up/api";
 
 interface UseMultiWorkflowStateProps {
   form: FormInstance;
@@ -547,7 +548,7 @@ export function useMultiWorkflowState({
       setPreviewLoading(true);
 
       const finalPayload = buildFinalPayload();
-      const res = await seatunnelJobDefinitionApi.buildGuideMultiConfig(
+      const res = await seatunnelStremJobDefinitionApi.buildGuideMultiConfig(
         finalPayload
       );
 
