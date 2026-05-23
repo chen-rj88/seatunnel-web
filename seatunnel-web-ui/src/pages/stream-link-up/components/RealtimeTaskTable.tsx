@@ -54,7 +54,7 @@ const RealtimeTaskTable: React.FC<RealtimeTaskTableProps> = ({
     {
       title: "名称/ID",
       dataIndex: "jobName",
-      width: 240,
+      width: 220,
       render: (_, record) => (
         <div>
           <div className="max-w-[190px] truncate font-bold leading-6 text-slate-950">
@@ -85,7 +85,7 @@ const RealtimeTaskTable: React.FC<RealtimeTaskTableProps> = ({
     {
       title: "状态",
       dataIndex: "taskParams",
-      width: "96",
+      width: 106,
       render: (_content: any, record: any) => (
         <div className="flex w-full justify-center">
           <TaskStatus
@@ -106,7 +106,6 @@ const RealtimeTaskTable: React.FC<RealtimeTaskTableProps> = ({
     {
       title: "执行概况",
       dataIndex: "执行概况",
-      width: "15%",
       render: (_content: any, record: any) => (
         <ExecutionStatus record={record} />
       ),
@@ -122,7 +121,7 @@ const RealtimeTaskTable: React.FC<RealtimeTaskTableProps> = ({
     {
       title: "操作",
       dataIndex: "operate",
-      width: 260,
+      width: 220,
       fixed: "right",
       render: (_, record) => (
         <RealtimeTaskActionColumn

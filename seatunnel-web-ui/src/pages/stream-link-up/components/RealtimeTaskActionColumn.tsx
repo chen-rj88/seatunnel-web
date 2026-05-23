@@ -287,15 +287,6 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
               disabled: isRunning,
             },
             {
-              key: "checkpoint",
-              label: "查看检查点",
-              disabled: !record.checkpointConfig,
-            },
-            {
-              key: "log",
-              label: "运行日志",
-            },
-            {
               type: "divider",
             },
             {
@@ -334,6 +325,7 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
             }
           },
         }}
+        placement="bottomLeft"
       >
         <button
           type="button"

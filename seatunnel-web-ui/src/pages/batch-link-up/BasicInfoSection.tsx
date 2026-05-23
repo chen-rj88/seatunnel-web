@@ -12,7 +12,7 @@ interface TaskDetailPanelProps {
 
 const AnimatedSyncArrow: React.FC = () => {
   return (
-    <span className="mx-3 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-50 text-blue-500 shadow-[0_1px_4px_rgba(15,23,42,0.08)]">
+    <span className="mx-3 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-50 text-blue-500 shadow-[0_1px_4px_rgba(15,23,42,0.08)]">
       <style>
         {`
           @keyframes syncArrowMove {
@@ -77,14 +77,14 @@ const BasicInfoSection: React.FC<TaskDetailPanelProps> = ({ item }) => {
         >
           <div className="flex items-center pl-3 text-black">
             {item?.sourceType && (
-              <DatabaseIcons dbType={item?.sourceType} width="24" height="24" />
+              <DatabaseIcons dbType={item?.sourceType} width="20" height="20" />
             )}
 
             <AnimatedSyncArrow />
 
             {item?.sinkType && (
               <span className="ml-3 flex items-center">
-                <DatabaseIcons dbType={item?.sinkType} width="24" height="24" />
+                <DatabaseIcons dbType={item?.sinkType} width="20" height="20" />
               </span>
             )}
           </div>
