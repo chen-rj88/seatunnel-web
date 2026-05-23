@@ -7,7 +7,7 @@ import org.apache.seatunnel.plugin.datasource.api.hocon.DataSourceHoconBuilder;
 import org.apache.seatunnel.plugin.datasource.api.hocon.HoconBuildContext;
 import org.apache.seatunnel.plugin.datasource.api.jdbc.JdbcConfigReaders;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -22,6 +22,7 @@ public abstract class AbstractCdcSourceBuilder implements DataSourceHoconBuilder
     protected static final String URL = "url";
 
     protected static final String DATABASE_NAMES = "database-names";
+    protected static final String DATABASE_PATTERN = "database-pattern";
     protected static final String TABLE_NAMES = "table-names";
     protected static final String TABLE_PATTERN = "table-pattern";
     protected static final String SERVER_ID = "server-id";
@@ -38,8 +39,6 @@ public abstract class AbstractCdcSourceBuilder implements DataSourceHoconBuilder
      * Frontend / node config field.
      */
     protected static final String DATABASE = "database";
-    protected static final String TABLE = "table";
-    protected static final String TABLE_NAMES_NODE = "tableNames";
 
     /**
      * Frontend startup fields.
@@ -53,6 +52,11 @@ public abstract class AbstractCdcSourceBuilder implements DataSourceHoconBuilder
     protected static final String STARTUP_MODE_LATEST = "latest";
     protected static final String STARTUP_MODE_SPECIFIC = "specific";
     protected static final String STARTUP_MODE_TIMESTAMP = "timestamp";
+
+    private final List<CdcTableOptionResolver> tableOptionResolvers = Arrays.asList(
+            new MultiTableCdcTableOptionResolver(),
+            new SingleTableCdcTableOptionResolver()
+    );
 
     @Override
     public boolean supportsSink() {
@@ -90,14 +94,12 @@ public abstract class AbstractCdcSourceBuilder implements DataSourceHoconBuilder
 
         // datasource 里面常见字段是 host，这里转成 SeaTunnel CDC 需要的 hostname
         putAliasIfPresent(conn, "host", HOSTNAME, map);
-
     }
 
     protected void appendCaptureOptions(Config conn, Config node, Map<String, Object> map) {
-        appendDatabaseNames(conn, node, map);
-        appendTableNames(conn, node, map);
+        appendDatabaseOptions(conn, node, map);
+        appendTableOptions(conn, node, map);
 
-        putIfPresent(node, TABLE_PATTERN, map);
         putIfPresent(node, SERVER_ID, map);
         putIfPresent(node, SERVER_TIME_ZONE, map);
 
@@ -106,11 +108,19 @@ public abstract class AbstractCdcSourceBuilder implements DataSourceHoconBuilder
         }
     }
 
-    protected void appendDatabaseNames(Config conn, Config node, Map<String, Object> map) {
+    protected void appendDatabaseOptions(Config conn, Config node, Map<String, Object> map) {
+
         if (node != null && node.hasPath(DATABASE_NAMES)) {
             putListIfPresent(node, DATABASE_NAMES, map);
             return;
         }
+
+
+        if (node != null && node.hasPath(DATABASE_PATTERN)) {
+            putIfPresent(node, DATABASE_PATTERN, map);
+            return;
+        }
+
 
         String database = getString(conn, DATABASE);
         if (StringUtils.isNotBlank(database)) {
@@ -118,59 +128,30 @@ public abstract class AbstractCdcSourceBuilder implements DataSourceHoconBuilder
         }
     }
 
-    protected void appendTableNames(Config conn, Config node, Map<String, Object> map) {
-        if (node != null && node.hasPath(TABLE_NAMES)) {
+    protected void appendTableOptions(Config conn, Config node, Map<String, Object> map) {
+        if (node == null) {
+            return;
+        }
+
+
+        if (node.hasPath(TABLE_NAMES)) {
             putListIfPresent(node, TABLE_NAMES, map);
             return;
         }
 
-        String database = getString(conn, DATABASE);
 
-        if (node != null && node.hasPath(TABLE_NAMES_NODE)) {
-            List<String> tables = node.getStringList(TABLE_NAMES_NODE);
-            List<String> fullTableNames = buildFullTableNames(database, tables);
-            if (!fullTableNames.isEmpty()) {
-                map.put(TABLE_NAMES, fullTableNames);
-            }
+        if (node.hasPath(TABLE_PATTERN)) {
+            putIfPresent(node, TABLE_PATTERN, map);
             return;
         }
 
-        String table = getString(node, TABLE);
-        if (StringUtils.isNotBlank(table)) {
-            map.put(TABLE_NAMES, Collections.singletonList(buildFullTableName(database, table)));
-        }
-    }
 
-    protected List<String> buildFullTableNames(String database, List<String> tables) {
-        List<String> result = new ArrayList<>();
-
-        if (tables == null || tables.isEmpty()) {
-            return result;
-        }
-
-        for (String table : tables) {
-            if (StringUtils.isBlank(table)) {
-                continue;
+        for (CdcTableOptionResolver resolver : tableOptionResolvers) {
+            if (resolver.supports(node)) {
+                resolver.resolve(conn, node, map);
+                return;
             }
-
-            result.add(buildFullTableName(database, table));
         }
-
-        return result;
-    }
-
-    protected String buildFullTableName(String database, String table) {
-        String trimmedTable = table.trim();
-
-        if (trimmedTable.contains(".")) {
-            return trimmedTable;
-        }
-
-        if (StringUtils.isBlank(database)) {
-            return trimmedTable;
-        }
-
-        return database.trim() + "." + trimmedTable;
     }
 
     /**
