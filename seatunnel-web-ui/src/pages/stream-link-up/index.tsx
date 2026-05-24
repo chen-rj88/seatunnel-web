@@ -378,25 +378,36 @@ const RealtimeSyncPage: React.FC = () => {
     ref.current?.onOpen(true, record, () => {});
   };
 
-  const handleEdit = async (record: StreamingJobDefinitionVO) => {
-    if (!record?.id) {
-      message.warning("任务 ID 不存在");
+  const handleEdit = async (item: StreamingJobDefinitionVO) => {
+    if (!item?.id) {
+      message.warning("任务ID不能为空");
       return;
     }
+    const id = item?.id;
+
+    console.log(item);
 
     try {
-      const res = await seatunnelStremJobDefinitionApi.selectEditDetail(
-        record.id
-      );
+      const mode = item?.mode;
 
-      if (res?.code !== 0) {
-        message.error(res?.message || res?.msg || "查询编辑详情失败");
+      if (mode === "GUIDE_SINGLE") {
+        history.push(`/sync/stream-link-up/${id}/config/single?scene=edit`);
         return;
       }
 
-      history.push(`/sync/stream-link-up/${record.id}/detail`);
+      if (mode === "GUIDE_MULTI") {
+        history.push(`/sync/stream-link-up/${id}/config/multi?scene=edit`);
+        return;
+      }
+
+      if (mode === "SCRIPT") {
+        history.push(`/sync/stream-link-up/${id}/config/script?scene=edit`);
+        return;
+      }
+
+      
     } catch (error) {
-      message.error("查询编辑详情失败");
+      
     }
   };
 
