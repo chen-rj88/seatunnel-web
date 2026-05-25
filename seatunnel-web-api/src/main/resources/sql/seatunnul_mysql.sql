@@ -148,6 +148,7 @@ CREATE TABLE `t_seatunnel_job_instance`
     `end_time`          datetime             DEFAULT NULL COMMENT '结束时间',
     `create_time`       datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time`       datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `job_mode`          varchar(32)          DEFAULT NULL COMMENT 'Job mode: BATCH / STREAMING',
     PRIMARY KEY (`id`),
     KEY                 `idx_job_definition_id` (`job_definition_id`),
     KEY                 `idx_job_status` (`job_status`),
