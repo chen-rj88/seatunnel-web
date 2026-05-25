@@ -32,7 +32,7 @@ const AutoResizeChart: React.FC<AutoResizeChartProps> = memo(({ option }) => {
   }, []);
 
   return (
-    <div ref={wrapperRef} className="dashboard-chart-wrapper">
+    <div ref={wrapperRef} className="h-full w-full">
       <ReactECharts
         ref={chartRef}
         option={option}

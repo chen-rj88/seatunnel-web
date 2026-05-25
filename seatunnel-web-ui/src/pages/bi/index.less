@@ -1,51 +1,15 @@
 :root {
-  --dashboard-primary: hsl(231 48% 48%);
-  --dashboard-primary-hover: hsl(231 52% 43%);
+  --dashboard-primary: #3f51b5;
+  --dashboard-primary-hover: #3546a1;
 
-  --dashboard-primary-soft: hsl(231 48% 48% / 0.08);
-  --dashboard-primary-soft-strong: hsl(231 48% 48% / 0.14);
+  --dashboard-primary-soft: rgb(63 81 181 / 0.08);
+  --dashboard-primary-soft-strong: rgb(63 81 181 / 0.14);
 
-  --dashboard-primary-border: hsl(231 48% 48% / 0.42);
-  --dashboard-primary-border-soft: hsl(231 48% 48% / 0.24);
+  --dashboard-primary-border: rgb(63 81 181 / 0.42);
+  --dashboard-primary-border-soft: rgb(63 81 181 / 0.24);
 
-  --dashboard-primary-shadow: hsl(231 48% 48% / 0.14);
-  --dashboard-primary-shadow-strong: hsl(231 48% 48% / 0.26);
-
-  --dashboard-card-border: hsl(220 14% 90%);
-  --dashboard-card-border-hover: hsl(231 48% 48% / 0.46);
-  --dashboard-card-shadow-hover: hsl(231 48% 48% / 0.1);
-}
-
-.dashboard-page {
-  height: 100vh;
-  overflow: auto;
-  background: #fff;
-}
-
-.dashboard-canvas {
-  width: 100%;
-  min-height: 100%;
-  padding: 8px;
-  background: #fff;
-  box-sizing: border-box;
-}
-
-.dashboard-canvas-inner {
-  position: relative;
-  width: 100%;
-  overflow: visible;
-  background: #fff;
-  box-sizing: border-box;
-}
-
-.dashboard-layout {
-  position: relative;
-  z-index: 10;
-  min-height: inherit;
-}
-
-.dashboard-grid-item {
-  height: 100%;
+  --dashboard-primary-shadow: rgb(63 81 181 / 0.14);
+  --dashboard-primary-shadow-strong: rgb(63 81 181 / 0.26);
 }
 
 .react-grid-item {
@@ -62,122 +26,12 @@
 .react-grid-item.react-grid-placeholder {
   z-index: 5;
   opacity: 1;
+  user-select: none;
   border-radius: 10px;
   border: 1px dashed var(--dashboard-primary);
-  background: hsl(231 48% 48% / 0.14);
-  box-shadow: inset 0 0 0 1px hsl(231 48% 48% / 0.08);
+  background: rgb(63 81 181 / 0.14);
+  box-shadow: inset 0 0 0 1px rgb(63 81 181 / 0.08);
   transition: none !important;
-  user-select: none;
-}
-
-.dashboard-card {
-  position: relative;
-  z-index: 10;
-  height: 100%;
-  overflow: hidden;
-  border: 1px solid var(--dashboard-card-border);
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
-  box-sizing: border-box;
-  transition:
-    border-color 0.18s ease,
-    box-shadow 0.18s ease,
-    transform 0.18s ease;
-  will-change: transform, box-shadow, border-color;
-}
-
-/* 顶部正中间的小点把手 */
-.dashboard-card-top-grip {
-  position: absolute;
-  top: 8px;
-  left: 50%;
-  z-index: 20;
-  display: grid;
-  width: 16px;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2px;
-  transform: translateX(-50%);
-  cursor: move;
-  opacity: 0.72;
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-
-.dashboard-card-top-grip span {
-  width: 3px;
-  height: 3px;
-  border-radius: 999px;
-  background: rgb(120 120 120);
-}
-
-.react-grid-item:hover .dashboard-card-top-grip {
-  opacity: 1;
-}
-
-.react-grid-item.react-draggable-dragging .dashboard-card-top-grip,
-.react-grid-item.react-resizable-resizing .dashboard-card-top-grip {
-  opacity: 1;
-  transform: translateX(-50%) scale(1.04);
-}
-
-.dashboard-card-header {
-  display: flex;
-  height: 36px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  box-sizing: border-box;
-  color: rgb(15 23 42);
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.dashboard-card-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dashboard-card-more {
-  display: flex;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: rgb(100 116 139);
-  font-size: 20px;
-  line-height: 1;
-  transition:
-    background-color 0.18s ease,
-    color 0.18s ease;
-}
-
-.dashboard-card-more:hover {
-  background: rgb(241 245 249);
-  color: rgb(15 23 42);
-}
-
-.dashboard-card-body {
-  height: calc(100% - 36px);
-  padding: 8px;
-  box-sizing: border-box;
-}
-
-.dashboard-chart-wrapper {
-  width: 100%;
-  height: 100%;
-}
-
-.react-grid-item:not(.dashboard-grid-item-selected):hover .dashboard-card {
-  border-color: var(--dashboard-card-border-hover);
-  box-shadow:
-    0 0 0 1px var(--dashboard-primary-shadow),
-    0 10px 28px var(--dashboard-card-shadow-hover);
 }
 
 .react-grid-item.react-draggable-dragging .dashboard-card,
@@ -186,6 +40,12 @@
   box-shadow:
     0 0 0 1px var(--dashboard-primary-border),
     0 14px 36px var(--dashboard-primary-shadow);
+}
+
+.react-grid-item.react-draggable-dragging .drag-handle,
+.react-grid-item.react-resizable-resizing .drag-handle {
+  opacity: 1;
+  transform: translateX(-50%) scale(1.04);
 }
 
 .react-resizable-handle {
@@ -198,22 +58,24 @@
 }
 
 .react-grid-item:hover .react-resizable-handle,
-.react-grid-item.react-resizable-resizing .react-resizable-handle {
+.react-grid-item.react-resizable-resizing .react-resizable-handle,
+.dashboard-grid-item-selected .react-resizable-handle {
   opacity: 1;
 }
 
 .react-resizable-handle-se {
   right: -5px !important;
   bottom: -5px !important;
+  z-index: 300;
+
   width: 16px !important;
   height: 16px !important;
   padding: 0 !important;
-  cursor: se-resize !important;
-  z-index: 300;
 
+  cursor: se-resize !important;
   border-radius: 999px !important;
-  background: var(--dashboard-primary) !important;
   border: 2px solid #fff !important;
+  background: var(--dashboard-primary) !important;
 
   box-shadow:
     0 4px 12px var(--dashboard-primary-shadow-strong),
@@ -228,15 +90,7 @@
   content: none !important;
 }
 
-.react-resizable-handle-se:hover {
-  background: var(--dashboard-primary-hover) !important;
-  transform: scale(1.16);
-
-  box-shadow:
-    0 6px 18px var(--dashboard-primary-shadow-strong),
-    0 0 0 5px var(--dashboard-primary-soft-strong);
-}
-
+.react-resizable-handle-se:hover,
 .react-grid-item.react-resizable-resizing .react-resizable-handle-se {
   background: var(--dashboard-primary-hover) !important;
   transform: scale(1.16);
@@ -250,24 +104,10 @@
   pointer-events: none;
 }
 
-.dashboard-grid-item-selected .dashboard-card {
-  border-color: var(--dashboard-primary);
-  box-shadow:
-    0 0 0 1px var(--dashboard-primary),
-    0 10px 30px var(--dashboard-primary-shadow),
-    0 0 0 4px var(--dashboard-primary-soft);
-}
-
-/* 选中后 hover 时再亮一点 */
 .dashboard-grid-item-selected:hover .dashboard-card {
   border-color: var(--dashboard-primary-hover);
   box-shadow:
     0 0 0 1px var(--dashboard-primary-hover),
     0 14px 36px var(--dashboard-primary-shadow-strong),
     0 0 0 5px var(--dashboard-primary-soft-strong);
-}
-
-/* 选中状态下，右下角缩放点默认显示 */
-.dashboard-grid-item-selected .react-resizable-handle {
-  opacity: 1;
 }
