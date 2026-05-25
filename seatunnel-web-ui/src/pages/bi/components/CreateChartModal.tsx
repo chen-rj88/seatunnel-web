@@ -146,25 +146,70 @@ const chartGroups: Array<{
     ],
   },
 ];
-
 const themeOptions = [
   {
-    label: "蓝色",
+    label: "蓝色系",
     value: "blue",
+    colors: ["#1f8ee5", "#2499ed", "#3da8f3", "#59b4f4", "#7fc5f5", "#b7ddf6"],
   },
   {
-    label: "紫色",
+    label: "紫灰色系",
+    value: "purpleGray",
+    colors: ["#d7b7ea", "#e8d9f3", "#f4eef9", "#c6a5c3", "#f6c7d9", "#a9c38f"],
+  },
+  {
+    label: "淡紫色系",
     value: "purple",
+    colors: ["#feb1d9", "#d695e1", "#ad8fdb", "#8477c6", "#86ddf4", "#72bcec"],
   },
   {
-    label: "绿色",
+    label: "淡米色系",
+    value: "beige",
+    colors: ["#f9f3d3", "#fad6b5", "#fcafae", "#fedfe5", "#ddf0ee", "#b6e3e8"],
+  },
+  {
+    label: "淡棕色系",
+    value: "brown",
+    colors: ["#efcfaf", "#efae6b", "#e4aa72", "#dd936f", "#b9744e", "#ba6830"],
+  },
+  {
+    label: "黄色系",
+    value: "yellow",
+    colors: ["#ffa001", "#ffb400", "#ffc107", "#ffca27", "#ffd550", "#fee180"],
+  },
+  {
+    label: "绿色系",
     value: "green",
+    colors: ["#679f38", "#7db343", "#8bc349", "#9ace63", "#afd582", "#c5e1a5"],
   },
   {
-    label: "橙色",
+    label: "橙色系",
     value: "orange",
+    colors: ["#f67d01", "#fb8c00", "#ff9800", "#ffa725", "#feb74d", "#ffcc80"],
   },
 ];
+
+const ThemeColorBar: React.FC<{
+  colors: string[];
+  compact?: boolean;
+}> = ({ colors, compact = false }) => {
+  return (
+    <div
+      className={[
+        "flex overflow-hidden rounded-full",
+        compact ? "h-3 w-[220px]" : "h-5 w-[232px]",
+      ].join(" ")}
+    >
+      {colors.map((color) => (
+        <span
+          key={color}
+          className="flex-1"
+          style={{ backgroundColor: color }}
+        />
+      ))}
+    </div>
+  );
+};
 
 const CreateChartModal: React.FC<CreateChartModalProps> = ({
   open,
@@ -178,12 +223,15 @@ const CreateChartModal: React.FC<CreateChartModalProps> = ({
   const [showLabel, setShowLabel] = useState(false);
   const [showAxis, setShowAxis] = useState(true);
   const [showGrid, setShowGrid] = useState(true);
+  const [themeOpen, setThemeOpen] = useState(false);
 
   const [chartTypeOpen, setChartTypeOpen] = useState(false);
 
   const [sortBy, setSortBy] = useState<"data" | "x" | "y">("data");
   const [theme, setTheme] = useState("blue");
-
+  const selectedTheme = useMemo(() => {
+    return themeOptions.find((item) => item.value === theme) || themeOptions[0];
+  }, [theme]);
   const selectedChart = useMemo(() => {
     return chartGroups
       .flatMap((group) => group.options)
@@ -386,9 +434,54 @@ const CreateChartModal: React.FC<CreateChartModalProps> = ({
 
                 <Select
                   value={theme}
-                  className="w-full"
-                  onChange={(value) => setTheme(value)}
-                  options={themeOptions}
+                  open={themeOpen}
+                  onOpenChange={setThemeOpen}
+                  className="w-full create-theme-select"
+                  popupClassName="create-theme-dropdown"
+                  suffixIcon={<span className="text-slate-400">⌄</span>}
+                  options={themeOptions.map((item) => ({
+                    value: item.value,
+                    label: <ThemeColorBar colors={item.colors} compact />,
+                  }))}
+                  onChange={(value) => {
+                    setTheme(value);
+                    setThemeOpen(false);
+                  }}
+                  labelRender={() => (
+                    <ThemeColorBar colors={selectedTheme.colors} compact />
+                  )}
+                  popupRender={() => (
+                    <div className="rounded-xl bg-white p-3">
+                      <div className="max-h-[260px] space-y-3 overflow-y-auto pr-1">
+                        {themeOptions.map((item) => {
+                          const active = item.value === theme;
+
+                          return (
+                            <button
+                              key={item.value}
+                              type="button"
+                              title={item.label}
+                              onMouseDown={(event) => {
+                                event.preventDefault();
+                              }}
+                              onClick={() => {
+                                setTheme(item.value);
+                                setThemeOpen(false);
+                              }}
+                              className={[
+                                "flex w-full items-center rounded-lg px-3 py-2 transition",
+                                active
+                                  ? "bg-[hsl(231_48%_96%)]"
+                                  : "hover:bg-slate-50",
+                              ].join(" ")}
+                            >
+                              <ThemeColorBar colors={item.colors} />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 />
               </div>
 
