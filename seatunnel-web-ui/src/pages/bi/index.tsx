@@ -16,9 +16,7 @@ import "react-resizable/css/styles.css";
 import "./index.less";
 
 import ChartCard from "./components/ChartCard";
-import CreateChartModal, {
-  CreateChartValues,
-} from "./components/CreateChartModal";
+
 import {
   COLS,
   MARGIN,
@@ -31,6 +29,7 @@ import {
   getLayoutBottomRow,
   persistDashboardLayout,
 } from "./dashboard.utils";
+import CreateChartModal from "./components/CreateChartModal";
 
 interface ChartMeta {
   id: string;
