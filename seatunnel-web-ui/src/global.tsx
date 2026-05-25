@@ -2,6 +2,8 @@ import { useIntl } from '@umijs/max';
 import { Button, message, notification } from 'antd';
 import defaultSettings from '../config/defaultSettings';
 import '../tailwind.css';
+import "react-grid-layout/css/styles.css";
+import "react-resizable/css/styles.css";
 
 const { pwa } = defaultSettings;
 const isHttps = document.location.protocol === 'https:';
