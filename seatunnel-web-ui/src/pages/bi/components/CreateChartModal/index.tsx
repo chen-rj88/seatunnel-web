@@ -100,7 +100,7 @@ const CreateChartModal: React.FC<CreateChartModalProps> = ({
             placeholder="请输入图表名称"
           />
 
-          <div className="mt-4 flex flex-1 items-center justify-center rounded-2xl border border-slate-100 bg-white p-5">
+          <div className="flex flex-1 items-center justify-center rounded-2xl border border-slate-100 bg-white p-5">
             <ChartPreview
               chartType={chartType}
               chartConfig={chartConfig}

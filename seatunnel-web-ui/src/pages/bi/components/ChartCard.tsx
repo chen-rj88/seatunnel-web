@@ -1,7 +1,4 @@
 import React, { memo } from "react";
-import { Dropdown } from "antd";
-import type { MenuProps } from "antd";
-import { Download, Settings, Trash2 } from "lucide-react";
 
 import AutoResizeChart from "./AutoResizeChart";
 
@@ -9,61 +6,10 @@ interface ChartCardProps {
   option: any;
   title?: string;
   selected?: boolean;
-
-  onSetting?: () => void;
-  onExport?: () => void;
-  onDelete?: () => void;
 }
 
 const ChartCard: React.FC<ChartCardProps> = memo(
-  ({
-    option,
-    title = "默认名",
-    selected = false,
-    onSetting,
-    onExport,
-    onDelete,
-  }) => {
-    const menuItems: MenuProps["items"] = [
-      {
-        key: "setting",
-        icon: <Settings size={15} />,
-        label: "设置图表",
-      },
-      {
-        key: "export",
-        icon: <Download size={15} />,
-        label: "导出图片",
-      },
-      {
-        type: "divider",
-      },
-      {
-        key: "delete",
-        danger: true,
-        icon: <Trash2 size={15} />,
-        label: "删除图表",
-      },
-    ];
-
-    const handleMenuClick: MenuProps["onClick"] = ({ key, domEvent }) => {
-      domEvent.stopPropagation();
-
-      if (key === "setting") {
-        onSetting?.();
-        return;
-      }
-
-      if (key === "export") {
-        onExport?.();
-        return;
-      }
-
-      if (key === "delete") {
-        onDelete?.();
-      }
-    };
-
+  ({ option, title = "默认名", selected = false }) => {
     return (
       <div
         className={[
@@ -72,13 +18,13 @@ const ChartCard: React.FC<ChartCardProps> = memo(
           "will-change-[transform,box-shadow,border-color]",
           selected
             ? [
-                "border-[hsl(231_48%_48%)]",
-                "shadow-[0_0_0_1px_hsl(231_48%_48%),0_10px_30px_hsl(231_48%_48%/0.14),0_0_0_4px_hsl(231_48%_48%/0.08)]",
+                "border-[#3f51b5]",
+                "shadow-[0_0_0_1px_#3f51b5,0_10px_30px_rgb(63_81_181_/_0.14),0_0_0_4px_rgb(63_81_181_/_0.08)]",
               ].join(" ")
             : [
                 "border-slate-200",
-                "hover:border-[hsl(231_48%_48%/0.50)]",
-                "hover:shadow-[0_0_0_1px_hsl(231_48%_48%/0.14),0_10px_28px_hsl(231_48%_48%/0.10)]",
+                "hover:border-[#3f51b5]/50",
+                "hover:shadow-[0_0_0_1px_rgb(63_81_181_/_0.14),0_10px_28px_rgb(63_81_181_/_0.10)]",
               ].join(" "),
         ]
           .filter(Boolean)
@@ -105,33 +51,22 @@ const ChartCard: React.FC<ChartCardProps> = memo(
             {title}
           </span>
 
-          <Dropdown
-            trigger={["click"]}
-            placement="bottomRight"
-            menu={{
-              items: menuItems,
-              onClick: handleMenuClick,
+          <button
+            type="button"
+            className={[
+              "dashboard-card-more flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center",
+              "rounded-md border-none bg-transparent text-xl leading-none text-slate-500",
+              "transition duration-200 hover:bg-slate-100 hover:text-slate-900",
+            ].join(" ")}
+            onMouseDown={(event) => {
+              event.stopPropagation();
             }}
-            overlayClassName="dashboard-card-dropdown"
+            onClick={(event) => {
+              event.stopPropagation();
+            }}
           >
-            <button
-              type="button"
-              className={[
-                "dashboard-card-more flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center",
-                "rounded-md border-none bg-transparent text-xl leading-none text-slate-500",
-                "transition duration-200 hover:bg-slate-100 hover:text-slate-900",
-              ].join(" ")}
-              onMouseDown={(event) => {
-                event.stopPropagation();
-              }}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-              }}
-            >
-              ⋮
-            </button>
-          </Dropdown>
+            ⋮
+          </button>
         </div>
 
         <div className="box-border h-[calc(100%-36px)] p-2">
