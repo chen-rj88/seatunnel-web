@@ -99,6 +99,15 @@ export default [
   },
 
   {
+    icon: 'pieChart',
+    name: '数据洞察',
+    path: '/bi',
+    component: './bi',
+    hideInMenu: true,
+  },
+
+
+  {
     name: 'Login',
     path: '/login',
     component: './login',

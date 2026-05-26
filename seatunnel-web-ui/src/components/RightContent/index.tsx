@@ -1,4 +1,4 @@
-import { ApiOutlined, QuestionCircleOutlined, ReadOutlined } from "@ant-design/icons";
+import { ApiOutlined, BarChartOutlined, QuestionCircleOutlined, ReadOutlined } from "@ant-design/icons";
 import { SelectLang as UmiSelectLang } from "@umijs/max";
 import { history } from "umi";
 import "./index.less";
@@ -26,21 +26,22 @@ export const SelectLang: React.FC = () => {
   );
 };
 
-export const Question: React.FC = () => {
+export const BI: React.FC = () => {
   return (
-    <a
-      href="http://localhost:3000/"
-      target="_blank"
-      rel="noreferrer"
+    <div
       style={{
         display: "inline-flex",
         padding: "4px",
         fontSize: "18px",
         color: "inherit",
+        cursor: "pointer",
+      }}
+      onClick={() => {
+        history.push("/bi");
       }}
     >
-      <QuestionCircleOutlined />
-    </a>
+      <BarChartOutlined  />
+    </div>
   );
 };
 
