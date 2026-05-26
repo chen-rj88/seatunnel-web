@@ -16,20 +16,16 @@ import "react-resizable/css/styles.css";
 import "./index.less";
 
 import ChartCard from "./components/ChartCard";
+import CreateChartModal from "./components/CreateChartModal";
 
-import {
-  COLS,
-  MARGIN,
-  ROW_HEIGHT,
-  defaultChartOption,
-} from "./dashboard.data";
+import type { CreateChartValues } from "./components/CreateChartModal/types";
+import { COLS, MARGIN, ROW_HEIGHT } from "./dashboard.data";
 import {
   getCanvasHeight,
   getInitialLayout,
   getLayoutBottomRow,
   persistDashboardLayout,
 } from "./dashboard.utils";
-import CreateChartModal from "./components/CreateChartModal";
 
 interface ChartMeta {
   id: string;
@@ -89,6 +85,9 @@ const Dashboard = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
   const [createChartOpen, setCreateChartOpen] = useState(false);
+
+  const [isEditingDashboardName, setIsEditingDashboardName] = useState(false);
+  const [dashboardNameDraft, setDashboardNameDraft] = useState("");
 
   const activeDashboard = useMemo(() => {
     return dashboards.find((item) => item.id === activeDashboardId);
@@ -184,10 +183,10 @@ const Dashboard = () => {
       i: nextChartId,
       x: 0,
       y: bottomRow,
-      w: 6,
-      h: 5,
-      minW: 3,
-      minH: 3,
+      w: 4,
+      h: 3,
+      minW: 2,
+      minH: 2,
     };
 
     const nextChartMeta: ChartMeta = {
@@ -236,6 +235,60 @@ const Dashboard = () => {
 
   const handleRefresh = () => {
     console.log("refresh dashboard");
+  };
+
+  const handleDeleteChart = (chartId: string) => {
+    const nextLayout = layout.filter((layoutItem) => layoutItem.i !== chartId);
+
+    setDashboards((prev) => {
+      return prev.map((dashboard) => {
+        if (dashboard.id !== activeDashboardId) {
+          return dashboard;
+        }
+
+        const nextCharts = { ...dashboard.charts };
+        delete nextCharts[chartId];
+
+        return {
+          ...dashboard,
+          layout: nextLayout,
+          charts: nextCharts,
+        };
+      });
+    });
+
+    persistDashboardLayout(nextLayout);
+    setSelectedCardId(null);
+  };
+
+  const handleStartEditDashboardName = () => {
+    setDashboardNameDraft(activeDashboard?.name || "");
+    setIsEditingDashboardName(true);
+  };
+
+  const handleCancelEditDashboardName = () => {
+    setDashboardNameDraft("");
+    setIsEditingDashboardName(false);
+  };
+
+  const handleSaveDashboardName = () => {
+    const nextName = dashboardNameDraft.trim() || "未命名仪表盘";
+
+    setDashboards((prev) => {
+      return prev.map((dashboard) => {
+        if (dashboard.id !== activeDashboardId) {
+          return dashboard;
+        }
+
+        return {
+          ...dashboard,
+          name: nextName,
+        };
+      });
+    });
+
+    setDashboardNameDraft("");
+    setIsEditingDashboardName(false);
   };
 
   return (
@@ -321,37 +374,48 @@ const Dashboard = () => {
         <main className="flex min-w-0 flex-1 flex-col">
           <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4">
             <div className="flex min-w-0 items-center gap-3">
-              <div
-                className={[
-                  "flex h-9 w-9 items-center justify-center rounded-xl",
-                  dashboardTheme.primarySoftBg,
-                  dashboardTheme.primaryText,
-                ].join(" ")}
-              >
-                <LayoutDashboard size={18} />
-              </div>
-
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h1 className="truncate text-sm font-semibold text-slate-900">
-                    {activeDashboard?.name || "未命名仪表盘"}
-                  </h1>
+                  {isEditingDashboardName ? (
+                    <input
+                      autoFocus
+                      value={dashboardNameDraft}
+                      onChange={(event) =>
+                        setDashboardNameDraft(event.target.value)
+                      }
+                      onBlur={handleSaveDashboardName}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          handleSaveDashboardName();
+                        }
 
-                  {isEditing && (
-                    <span
+                        if (event.key === "Escape") {
+                          handleCancelEditDashboardName();
+                        }
+                      }}
                       className={[
-                        "rounded-full px-2 py-0.5 text-[11px] font-medium",
-                        dashboardTheme.primarySoftBg,
-                        dashboardTheme.primaryText,
+                        "h-8 w-[220px] rounded-lg border border-slate-200 bg-white px-2",
+                        "text-sm font-semibold text-slate-900 outline-none transition",
+                        "focus:border-[hsl(231_48%_48%)] focus:ring-2 focus:ring-[hsl(231_48%_48%/0.12)]",
                       ].join(" ")}
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleStartEditDashboardName}
+                      className="group flex min-w-0 items-center gap-1.5 rounded-lg px-1 py-1 text-left transition hover:bg-slate-50"
+                      title="点击编辑仪表盘名称"
                     >
-                      编辑中
-                    </span>
-                  )}
-                </div>
+                      <h1 className="truncate text-sm font-semibold text-slate-900">
+                        {activeDashboard?.name || "未命名仪表盘"}
+                      </h1>
 
-                <div className="text-xs text-slate-400">
-                  支持拖拽布局、缩放卡片和添加图表
+                      <Edit3
+                        size={13}
+                        className="shrink-0 text-slate-300 opacity-0 transition group-hover:opacity-100"
+                      />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -396,8 +460,7 @@ const Dashboard = () => {
                       ].join(" "),
                 ].join(" ")}
               >
-                {isEditing ? <Check size={15} /> : <Edit3 size={15} />}
-                {isEditing ? "完成" : "编辑"}
+                <Check size={15} />
               </button>
             </div>
           </header>
@@ -416,8 +479,8 @@ const Dashboard = () => {
               }}
             >
               {layout.length === 0 ? (
-                <div className="flex h-[420px] items-center justify-center">
-                  <div className="flex w-[360px] flex-col items-center rounded-3xl border border-dashed border-slate-300 bg-white px-8 py-10 text-center shadow-sm">
+                <div className="flex h-[720px] items-center justify-center">
+                  <div className="flex w-[360px] flex-col items-center rounded-3xl px-8 py-10 text-center ">
                     <div
                       className={[
                         "mb-4 flex h-12 w-12 items-center justify-center rounded-2xl",
@@ -445,7 +508,6 @@ const Dashboard = () => {
                         dashboardTheme.primaryBgHover,
                       ].join(" ")}
                     >
-                      <Plus size={15} />
                       创建图表
                     </button>
                   </div>
@@ -514,8 +576,8 @@ const Dashboard = () => {
                         }}
                       >
                         <ChartCard
-                          option={defaultChartOption}
                           title={chartMeta?.name || "默认名"}
+                          chartConfig={chartMeta?.config}
                           selected={selected}
                           onSetting={() => {
                             console.log("设置图表", item.i, chartMeta);
@@ -524,29 +586,7 @@ const Dashboard = () => {
                             console.log("导出图片", item.i);
                           }}
                           onDelete={() => {
-                            const nextLayout = layout.filter(
-                              (layoutItem) => layoutItem.i !== item.i
-                            );
-
-                            setDashboards((prev) => {
-                              return prev.map((dashboard) => {
-                                if (dashboard.id !== activeDashboardId) {
-                                  return dashboard;
-                                }
-
-                                const nextCharts = { ...dashboard.charts };
-                                delete nextCharts[item.i];
-
-                                return {
-                                  ...dashboard,
-                                  layout: nextLayout,
-                                  charts: nextCharts,
-                                };
-                              });
-                            });
-
-                            persistDashboardLayout(nextLayout);
-                            setSelectedCardId(null);
+                            handleDeleteChart(item.i);
                           }}
                         />
                       </div>

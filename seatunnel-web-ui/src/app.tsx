@@ -1,22 +1,20 @@
-import "d3-transition";
-import {
-  AvatarDropdown,
-  AvatarName,
-  Footer,
-  Question,
-  SelectLang,
-} from "@/components";
+import { AvatarDropdown, AvatarName, Footer, SelectLang } from "@/components";
 import type { Settings as LayoutSettings } from "@ant-design/pro-components";
 import { SettingDrawer } from "@ant-design/pro-components";
 import "@ant-design/v5-patch-for-react-19";
 import type { RequestConfig, RunTimeLayoutConfig } from "@umijs/max";
 import { history } from "@umijs/max";
+import "d3-transition";
 import defaultSettings from "../config/defaultSettings";
-import { GlobalSearch, Knowledge, OpenAPI } from "./components/RightContent";
+import {
+  BI,
+  GlobalSearch,
+  Knowledge,
+  OpenAPI,
+} from "./components/RightContent";
+import ThemeSwitch from "./components/RightContent/ThemeSwitch";
 import { errorConfig } from "./requestErrorConfig";
 import HttpUtils from "./utils/HttpUtils";
-import ThemeSwitch from "./components/RightContent/ThemeSwitch";
-
 
 const isDev = process.env.NODE_ENV === "development";
 const loginPath = "/login";
@@ -32,11 +30,10 @@ export async function getInitialState(): Promise<{
 }> {
   const fetchUserInfo = async () => {
     try {
-      
       const msg = await HttpUtils.get<API.CurrentUser | undefined>(
         "/api/v1/users/currentUser"
       );
-      
+
       return msg.data;
     } catch (_error) {
       history.push(loginPath);
@@ -45,11 +42,7 @@ export async function getInitialState(): Promise<{
   };
   // 如果不是登录页面，执行
   const { location } = history;
-  if (
-    ![loginPath, "/login"].includes(
-      location.pathname
-    )
-  ) {
+  if (![loginPath, "/login"].includes(location.pathname)) {
     const currentUser = await fetchUserInfo();
     return {
       fetchUserInfo,
@@ -76,7 +69,7 @@ export const layout: RunTimeLayoutConfig = ({
       <GlobalSearch key="globalsearch" />,
       <OpenAPI key="open-api" />,
       <Knowledge key="knowledge" />,
-      <Question key="doc" />,
+      <BI key="bi" />,
       <ThemeSwitch key="theme-switch" />,
       <SelectLang key="SelectLang" />,
     ],
