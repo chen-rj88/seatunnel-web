@@ -67,7 +67,7 @@ export const layout: RunTimeLayoutConfig = ({
     },
     actionsRender: () => [
       <GlobalSearch key="globalsearch" />,
-      <OpenAPI key="open-api" />,
+      // <OpenAPI key="open-api" />,
       <Knowledge key="knowledge" />,
       <BI key="bi" />,
       <ThemeSwitch key="theme-switch" />,

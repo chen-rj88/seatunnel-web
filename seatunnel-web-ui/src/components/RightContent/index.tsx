@@ -1,4 +1,4 @@
-import { ApiOutlined, QuestionCircleOutlined, ReadOutlined } from "@ant-design/icons";
+import { ApiOutlined, BarChartOutlined, QuestionCircleOutlined, ReadOutlined } from "@ant-design/icons";
 import { SelectLang as UmiSelectLang } from "@umijs/max";
 import { history } from "umi";
 import "./index.less";
@@ -40,7 +40,7 @@ export const BI: React.FC = () => {
         history.push("/bi");
       }}
     >
-      <ReadOutlined />
+      <BarChartOutlined  />
     </div>
   );
 };
