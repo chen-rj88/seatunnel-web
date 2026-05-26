@@ -75,10 +75,6 @@ interface CommonClientLinkSectionProps {
 
   sectionRef?: React.RefObject<HTMLDivElement>;
 
-  /**
-   * 不同页面可以改文案。
-   * 不传则走默认值。
-   */
   clientLabel?: string;
   clientPlaceholder?: string;
   sourceTitle?: string;
@@ -86,9 +82,6 @@ interface CommonClientLinkSectionProps {
   sourceCreateText?: string;
   targetCreateText?: string;
 
-  /**
-   * 如果实时/离线后端参数稍微不一样，可以通过这里追加。
-   */
   getVerifyExtraParams?: (params: {
     side: "source" | "target";
     triggerMode: "AUTO" | "MANUAL";
@@ -337,7 +330,7 @@ const LinkStatusAction: React.FC<{
   return (
     <div
       className={[
-        "flex h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 shadow-sm",
+        "flex h-9 shrink-0 items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 shadow-sm",
         reverse ? "flex-row-reverse" : "",
       ].join(" ")}
     >
@@ -380,15 +373,17 @@ const SectionCard: React.FC<{
   footer?: React.ReactNode;
 }> = ({ title, status, verifyItems, children, footer }) => {
   return (
-    <section className="min-w-0 flex-1 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+    <section className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-        <div className="flex items-center gap-3">
-          <div className="text-sm font-semibold text-slate-800">{title}</div>
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="shrink-0 text-sm font-semibold text-slate-800">
+            {title}
+          </div>
           {status ? <SimpleStatus status={status} items={verifyItems} /> : null}
         </div>
       </div>
 
-      <div className="flex h-[320px] flex-col px-4 py-4">
+      <div className="flex min-h-[280px] flex-col px-4 py-4 md:min-h-[320px]">
         <div className="flex-1">{children}</div>
         {footer ? <div className="pt-4">{footer}</div> : null}
       </div>
@@ -1117,17 +1112,17 @@ const CommonClientLinkSection: React.FC<CommonClientLinkSectionProps> = ({
 
   return (
     <>
-      <div ref={sectionRef} className="bg-white px-8 py-8">
-        <div className="mx-auto space-y-6">
-          <div className="rounded-[28px] border border-slate-200 bg-gradient-to-b from-slate-50 to-white px-6 py-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-            <div className="flex items-center justify-between gap-4 text-sm text-slate-700">
-              <div className="flex min-w-0 flex-1 items-center justify-center gap-4">
+      <div ref={sectionRef} className="bg-white px-4 py-6 md:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[1480px] space-y-6">
+          <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] md:px-6 md:py-5">
+            <div className="overflow-x-auto">
+              <div className="flex min-w-[760px] items-center justify-center gap-4 text-sm text-slate-700">
                 <span className="shrink-0 font-medium text-slate-900">
                   {sourceLabel || "数据来源"}
                 </span>
 
                 <div className="flex items-center gap-3">
-                  <div className="h-px w-10 bg-slate-300" />
+                  <div className="h-px w-8 bg-slate-300 md:w-10" />
                   <LinkStatusAction
                     status={sourceTestStatus}
                     onTest={() =>
@@ -1137,7 +1132,7 @@ const CommonClientLinkSection: React.FC<CommonClientLinkSectionProps> = ({
                       })
                     }
                   />
-                  <div className="h-px w-10 bg-slate-300" />
+                  <div className="h-px w-8 bg-slate-300 md:w-10" />
                 </div>
 
                 <span className="shrink-0 font-medium text-slate-900">
@@ -1145,7 +1140,7 @@ const CommonClientLinkSection: React.FC<CommonClientLinkSectionProps> = ({
                 </span>
 
                 <div className="flex items-center gap-3">
-                  <div className="h-px w-10 bg-slate-300" />
+                  <div className="h-px w-8 bg-slate-300 md:w-10" />
                   <LinkStatusAction
                     status={targetTestStatus}
                     onTest={() =>
@@ -1156,7 +1151,7 @@ const CommonClientLinkSection: React.FC<CommonClientLinkSectionProps> = ({
                     }
                     reverse
                   />
-                  <div className="h-px w-10 bg-slate-300" />
+                  <div className="h-px w-8 bg-slate-300 md:w-10" />
                 </div>
 
                 <span className="shrink-0 font-medium text-slate-900">
@@ -1166,7 +1161,7 @@ const CommonClientLinkSection: React.FC<CommonClientLinkSectionProps> = ({
             </div>
           </div>
 
-          <div className="flex gap-6">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3 xl:gap-6">
             <SectionCard
               title={sourceTitle}
               status={sourceTestStatus}
