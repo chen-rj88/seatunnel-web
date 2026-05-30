@@ -19,6 +19,7 @@ import org.apache.seatunnel.web.core.verify.modal.DatasourceVerifyContext;
 import org.apache.seatunnel.web.dao.entity.DataSource;
 import org.apache.seatunnel.web.dao.entity.SeaTunnelClient;
 import org.apache.seatunnel.web.dao.repository.SeaTunnelClientDao;
+import org.apache.seatunnel.web.engine.client.modal.SeaTunnelClientAuth;
 import org.apache.seatunnel.web.engine.client.rest.SeaTunnelRestClient;
 import org.apache.seatunnel.web.spi.bean.dto.ClientDatasourceVerifyDTO;
 import org.apache.seatunnel.web.spi.bean.dto.SeaTunnelClientDTO;
@@ -348,12 +349,16 @@ public class SeaTunnelClientServiceImpl implements SeaTunnelClientService {
 
         Map<String, Object> overview;
         try {
-            overview = seaTunnelRestClient.overview(buildOverviewUrl(baseUrl), null);
+            overview = seaTunnelRestClient.overview(
+                    buildOverviewUrl(baseUrl),
+                    null,
+                    buildAuth(entity)
+            );
         } catch (Exception e) {
             log.warn("Fetch SeaTunnel client overview failed, baseUrl={}", baseUrl, e);
             throw new ServiceException(
                     Status.INTERNAL_SERVER_ERROR_ARGS,
-                    "SeaTunnel 客户端连接失败，请检查客户端地址、端口或 Zeta 引擎是否已启动"
+                    "SeaTunnel 客户端连接失败，请检查客户端地址、端口、账号密码或 Zeta 引擎是否已启动"
             );
         }
 
@@ -361,6 +366,20 @@ public class SeaTunnelClientServiceImpl implements SeaTunnelClientService {
         checkSupportedClientVersion(clientVersion);
 
         entity.setClientVersion(clientVersion);
+    }
+
+    private SeaTunnelClientAuth buildAuth(SeaTunnelClient entity) {
+        SeaTunnelClientAuth auth = new SeaTunnelClientAuth();
+
+        if (entity == null) {
+            return auth;
+        }
+
+        auth.setAuthEnabled(entity.getAuthEnabled());
+        auth.setUsername(entity.getUsername());
+        auth.setPassword(entity.getPassword());
+
+        return auth;
     }
 
     private String resolveClientVersion(Map<String, Object> overview) {
@@ -435,6 +454,22 @@ public class SeaTunnelClientServiceImpl implements SeaTunnelClientService {
                     Status.INTERNAL_SERVER_ERROR_ARGS,
                     "客户端端口不能为空"
             );
+        }
+
+        if (Boolean.TRUE.equals(dto.getAuthEnabled())) {
+            if (StringUtils.isBlank(dto.getUsername())) {
+                throw new ServiceException(
+                        Status.INTERNAL_SERVER_ERROR_ARGS,
+                        "开启认证后，用户名不能为空"
+                );
+            }
+
+            if (StringUtils.isBlank(dto.getPassword())) {
+                throw new ServiceException(
+                        Status.INTERNAL_SERVER_ERROR_ARGS,
+                        "开启认证后，密码不能为空"
+                );
+            }
         }
     }
 

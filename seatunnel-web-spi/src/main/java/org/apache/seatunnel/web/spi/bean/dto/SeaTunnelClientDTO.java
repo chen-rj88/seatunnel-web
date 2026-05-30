@@ -14,4 +14,7 @@ public class SeaTunnelClientDTO {
     private String clientAddress;
     private String clientPort;
     private String remark;
+    private Boolean authEnabled;
+    private String username;
+    private String password;
 }

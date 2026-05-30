@@ -31,6 +31,12 @@ public class SeaTunnelClient {
 
     private String clientPort;
 
+    private Boolean authEnabled;
+
+    private String username;
+
+    private String password;
+
     private String remark;
 
     private Date createTime;

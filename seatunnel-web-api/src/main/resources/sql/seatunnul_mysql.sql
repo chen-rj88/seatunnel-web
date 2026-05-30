@@ -52,6 +52,10 @@ CREATE TABLE `t_seatunnel_client`
     KEY              `idx_heartbeat_time` (`heartbeat_time`)
 ) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='SeaTunnel Client表';
 
+ALTER TABLE t_seatunnel_client
+    ADD COLUMN auth_enabled TINYINT DEFAULT 0 COMMENT '是否开启认证',
+ADD COLUMN username VARCHAR(128) NULL COMMENT 'Zeta Engine 用户名',
+ADD COLUMN password VARCHAR(512) NULL COMMENT 'Zeta Engine 密码';
 
 -- seatunnel_web.t_seatunnel_datasource definition
 

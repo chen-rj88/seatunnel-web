@@ -1,6 +1,6 @@
 import ZetaIcon from "@/pages/batch-link-up/workflow/sider/icon/ZetaIcon";
 import { SmileOutlined } from "@ant-design/icons";
-import { Button, Form, Input, Modal, Select } from "antd";
+import { Button, Col, Form, Input, Modal, Row, Select, Switch } from "antd";
 import React, { useEffect, useRef } from "react";
 
 const { TextArea } = Input;
@@ -12,6 +12,9 @@ export interface SeaTunnelClientFormValues {
   clientAddress: string;
   clientPort: string | number;
   remark?: string;
+  authEnabled?: boolean;
+  username?: string;
+  password?: string;
 }
 
 interface AddClientModalProps {
@@ -28,8 +31,7 @@ const engineOptions = [
   {
     label: (
       <div style={{ display: "flex", alignItems: "center" }}>
-        <ZetaIcon height="20" width="20" /> &nbsp;
-        ZETA
+        <ZetaIcon height="20" width="20" /> &nbsp; ZETA
       </div>
     ),
     value: "ZETA",
@@ -127,6 +129,10 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
         clientAddress: initialValues?.clientAddress,
         clientPort: initialValues?.clientPort || 8080,
         remark: initialValues?.remark,
+
+        authEnabled: Boolean(initialValues?.authEnabled),
+        username: initialValues?.username,
+        password: initialValues?.password,
       });
       return;
     }
@@ -233,27 +239,69 @@ const AddClientModal: React.FC<AddClientModalProps> = ({
             <Input />
           </Form.Item>
 
-          <Form.Item
-            name="clientName"
-            label="客户端名称"
-            rules={[{ required: true, message: "请输入 Client Name" }]}
-          >
-            <Input
-              placeholder="例如：ZETA-独孤九剑"
-              style={{ height: 32, borderRadius: 16 }}
-            />
-          </Form.Item>
+          <Row gutter={24}>
+            <Col span={12}>
+              <Form.Item
+                name="clientName"
+                label="客户端名称"
+                rules={[{ required: true, message: "请输入 Client Name" }]}
+              >
+                <Input
+                  placeholder="例如：ZETA-独孤九剑"
+                  style={{ height: 32, borderRadius: 16 }}
+                />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="engineType"
+                label="引擎类型"
+                rules={[{ required: true, message: "请选择 Engine Type" }]}
+              >
+                <Select
+                  placeholder="请选择引擎类型"
+                  options={engineOptions}
+                  style={{ width: "100%" }}
+                />
+              </Form.Item>
+            </Col>
+          </Row>
 
           <Form.Item
-            name="engineType"
-            label="引擎类型"
-            rules={[{ required: true, message: "请选择 Engine Type" }]}
+            name="authEnabled"
+            valuePropName="checked"
+            label="开启认证"
           >
-            <Select
-              placeholder="请选择引擎类型"
-              options={engineOptions}
-              style={{ width: "100%" }}
-            />
+            <Switch />
+          </Form.Item>
+
+          <Form.Item noStyle shouldUpdate>
+            {({ getFieldValue }) =>
+              getFieldValue("authEnabled") ? (
+                <>
+                  <Row gutter={24}>
+                    <Col span={12}>
+                      <Form.Item
+                        name="username"
+                        label="用户名"
+                        rules={[{ required: true, message: "请输入用户名" }]}
+                      >
+                        <Input placeholder="admin" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item
+                        name="password"
+                        label="密码"
+                        rules={[{ required: true, message: "请输入密码" }]}
+                      >
+                        <Input.Password placeholder="请输入密码" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </>
+              ) : null
+            }
           </Form.Item>
 
           <div className="grid grid-cols-[1fr_160px] gap-4">
