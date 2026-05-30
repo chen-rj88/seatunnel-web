@@ -1,6 +1,7 @@
 package org.apache.seatunnel.web.engine.client.rest;
 
 import org.apache.seatunnel.web.engine.client.exceptions.SeatunnelClientException;
+import org.apache.seatunnel.web.engine.client.modal.SeaTunnelClientAuth;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,9 @@ import java.util.Map;
 @Service
 public class SeaTunnelRestClient {
 
+    private static final String DEFAULT_FINISHED_JOB_STATE = "UNKNOWABLE";
+    private static final String DEFAULT_CONFIG_FILE_NAME = "job.conf";
+
     private final RestTemplate restTemplate;
     private final SeaTunnelClientResolver seatunnelClientResolver;
 
@@ -28,15 +32,134 @@ public class SeaTunnelRestClient {
         this.seatunnelClientResolver = seatunnelClientResolver;
     }
 
+    /* ===================== URL ===================== */
+
     private String url(Long clientId, String path) {
         String baseApiUrl = seatunnelClientResolver.resolveBaseApiUrl(clientId);
-        if (path == null || path.isEmpty()) {
+
+        if (baseApiUrl == null || baseApiUrl.trim().isEmpty()) {
+            throw new SeatunnelClientException(
+                    "SeaTunnel client baseUrl is empty",
+                    -1,
+                    "",
+                    null
+            );
+        }
+
+        baseApiUrl = trimEndSlash(baseApiUrl.trim());
+
+        if (path == null || path.trim().isEmpty()) {
             return baseApiUrl;
         }
+
+        path = path.trim();
         if (!path.startsWith("/")) {
             path = "/" + path;
         }
+
         return baseApiUrl + path;
+    }
+
+    private String trimEndSlash(String value) {
+        while (value.endsWith("/")) {
+            value = value.substring(0, value.length() - 1);
+        }
+        return value;
+    }
+
+    /* ===================== Headers ===================== */
+
+    private HttpHeaders jsonHeaders(Long clientId) {
+        return headers(clientId, MediaType.APPLICATION_JSON);
+    }
+
+    private HttpHeaders textHeaders(Long clientId) {
+        return headers(clientId, MediaType.TEXT_PLAIN);
+    }
+
+    private HttpHeaders multipartHeaders(Long clientId) {
+        return headers(clientId, MediaType.MULTIPART_FORM_DATA);
+    }
+
+    private HttpHeaders getHeaders(Long clientId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+        applyBasicAuth(clientId, headers);
+        return headers;
+    }
+
+    private HttpHeaders headers(Long clientId, MediaType contentType) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(contentType);
+        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+        applyBasicAuth(clientId, headers);
+        return headers;
+    }
+
+    private void applyBasicAuth(Long clientId, HttpHeaders headers) {
+        if (clientId == null) {
+            return;
+        }
+
+        SeaTunnelClientAuth auth = seatunnelClientResolver.resolveAuth(clientId);
+
+        if (auth == null) {
+            return;
+        }
+
+        if (!Boolean.TRUE.equals(auth.getAuthEnabled())) {
+            return;
+        }
+
+        if (isBlank(auth.getUsername()) || isBlank(auth.getPassword())) {
+            return;
+        }
+
+        headers.setBasicAuth(
+                auth.getUsername().trim(),
+                auth.getPassword(),
+                StandardCharsets.UTF_8
+        );
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    /* ===================== Common Request ===================== */
+
+    private <T> T get(Long clientId, String requestUrl, Class<T> responseType, String hint) {
+        try {
+            ResponseEntity<T> response = restTemplate.exchange(
+                    requestUrl,
+                    HttpMethod.GET,
+                    new HttpEntity<Void>(null, getHeaders(clientId)),
+                    responseType
+            );
+            return response.getBody();
+        } catch (Exception e) {
+            throw wrap(e, hint);
+        }
+    }
+
+    private <T> T post(Long clientId,
+                       String requestUrl,
+                       Object body,
+                       HttpHeaders headers,
+                       Class<T> responseType,
+                       String hint) {
+        try {
+            HttpEntity<Object> entity = new HttpEntity<>(body, headers);
+            ResponseEntity<T> response = restTemplate.exchange(
+                    requestUrl,
+                    HttpMethod.POST,
+                    entity,
+                    responseType
+            );
+            return response.getBody();
+        } catch (Exception e) {
+            throw wrap(e, hint);
+        }
     }
 
     private RuntimeException wrap(Exception e, String hint) {
@@ -49,117 +172,184 @@ public class SeaTunnelRestClient {
                     he
             );
         }
-        return new SeatunnelClientException(hint, -1, "", e);
+
+        return new SeatunnelClientException(
+                hint,
+                -1,
+                "",
+                e
+        );
     }
 
-    private String safe(String s) {
-        return s == null ? "" : s;
-    }
-
-    private HttpHeaders jsonHeaders() {
-        HttpHeaders h = new HttpHeaders();
-        h.setContentType(MediaType.APPLICATION_JSON);
-        h.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-        return h;
-    }
-
-    private HttpHeaders textHeaders() {
-        HttpHeaders h = new HttpHeaders();
-        h.setContentType(MediaType.TEXT_PLAIN);
-        h.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
-        return h;
+    private String safe(String value) {
+        return value == null ? "" : value;
     }
 
     /* ===================== GET ===================== */
 
     public Map overview(Long clientId, Map<String, String> tags) {
-        String baseUrl = url(clientId, "/overview");
-        return overview(baseUrl, tags);
-    }
-
-    public Map overview(String baseUrl, Map<String, String> tags) {
         try {
-            UriComponentsBuilder b = UriComponentsBuilder.fromHttpUrl(baseUrl);
-            if (tags != null) {
-                for (Map.Entry<String, String> e : tags.entrySet()) {
-                    b.queryParam(e.getKey(), e.getValue());
-                }
-            }
-            return restTemplate.getForObject(b.build(true).toUri(), Map.class);
+            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(url(clientId, "/overview"));
+            appendQueryParams(builder, tags);
+
+            return get(
+                    clientId,
+                    builder.build(true).toUriString(),
+                    Map.class,
+                    "GET /overview failed"
+            );
         } catch (Exception e) {
             throw wrap(e, "GET /overview failed");
         }
     }
 
-    public List runningJobs(Long clientId) {
+    /**
+     * 保留这个重载，适合没有 clientId 的临时探活场景。
+     *
+     * 注意：这个方法没有 clientId，所以无法从数据库读取账号密码。
+     * 如果 Zeta Engine 开启了 Basic Auth，建议优先使用 overview(Long clientId, Map<String, String> tags)。
+     */
+    public Map overview(String baseUrl, Map<String, String> tags) {
         try {
-            return restTemplate.getForObject(url(clientId, "/running-jobs"), List.class);
+            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(baseUrl);
+            appendQueryParams(builder, tags);
+
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    builder.build(true).toUri(),
+                    HttpMethod.GET,
+                    new HttpEntity<Void>(null, new HttpHeaders()),
+                    Map.class
+            );
+
+            return response.getBody();
         } catch (Exception e) {
-            throw wrap(e, "GET /running-jobs failed");
+            throw wrap(e, "GET /overview failed");
         }
+    }
+
+    public Map overview(String baseUrl, Map<String, String> tags, SeaTunnelClientAuth auth) {
+        try {
+            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(baseUrl);
+            appendQueryParams(builder, tags);
+
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    builder.build(true).toUri(),
+                    HttpMethod.GET,
+                    new HttpEntity<Void>(null, getHeaders(auth)),
+                    Map.class
+            );
+
+            return response.getBody();
+        } catch (Exception e) {
+            throw wrap(e, "GET /overview failed");
+        }
+    }
+
+    private HttpHeaders getHeaders(SeaTunnelClientAuth auth) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+        applyBasicAuth(auth, headers);
+        return headers;
+    }
+
+    private void applyBasicAuth(SeaTunnelClientAuth auth, HttpHeaders headers) {
+        if (auth == null) {
+            return;
+        }
+
+        if (!Boolean.TRUE.equals(auth.getAuthEnabled())) {
+            return;
+        }
+
+        if (isBlank(auth.getUsername()) || isBlank(auth.getPassword())) {
+            return;
+        }
+
+        headers.setBasicAuth(
+                auth.getUsername().trim(),
+                auth.getPassword(),
+                StandardCharsets.UTF_8
+        );
+    }
+
+    public List runningJobs(Long clientId) {
+        return get(
+                clientId,
+                url(clientId, "/running-jobs"),
+                List.class,
+                "GET /running-jobs failed"
+        );
     }
 
     public Map jobInfo(Long clientId, long jobId) {
-        try {
-            return restTemplate.getForObject(url(clientId, "/job-info/" + jobId), Map.class);
-        } catch (Exception e) {
-            throw wrap(e, "GET /job-info/{jobId} failed");
-        }
+        return get(
+                clientId,
+                url(clientId, "/job-info/" + jobId),
+                Map.class,
+                "GET /job-info/{jobId} failed"
+        );
     }
 
     public List finishedJobs(Long clientId, String state) {
-        try {
-            if (state == null || state.trim().isEmpty()) {
-                state = "UNKNOWABLE";
-            }
-            return restTemplate.getForObject(url(clientId, "/finished-jobs/" + state), List.class);
-        } catch (Exception e) {
-            throw wrap(e, "GET /finished-jobs/{state} failed");
+        if (isBlank(state)) {
+            state = DEFAULT_FINISHED_JOB_STATE;
         }
+
+        return get(
+                clientId,
+                url(clientId, "/finished-jobs/" + state.trim()),
+                List.class,
+                "GET /finished-jobs/{state} failed"
+        );
     }
 
     public List systemMonitoringInformation(Long clientId) {
-        try {
-            return restTemplate.getForObject(url(clientId, "/system-monitoring-information"), List.class);
-        } catch (Exception e) {
-            throw wrap(e, "GET /system-monitoring-information failed");
-        }
+        return get(
+                clientId,
+                url(clientId, "/system-monitoring-information"),
+                List.class,
+                "GET /system-monitoring-information failed"
+        );
     }
 
     public Object logs(Long clientId, Long jobIdOrNull, String formatOrNull) {
         try {
-            String path = (jobIdOrNull == null) ? "/logs" : ("/logs/" + jobIdOrNull);
-            UriComponentsBuilder b = UriComponentsBuilder.fromHttpUrl(url(clientId, path));
-            if (formatOrNull != null && !formatOrNull.trim().isEmpty()) {
-                b.queryParam("format", formatOrNull);
+            String path = jobIdOrNull == null ? "/logs" : "/logs/" + jobIdOrNull;
+
+            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(url(clientId, path));
+            if (!isBlank(formatOrNull)) {
+                builder.queryParam("format", formatOrNull.trim());
             }
-            return restTemplate.getForObject(b.build(true).toUri(), Object.class);
+
+            return get(
+                    clientId,
+                    builder.build(true).toUriString(),
+                    Object.class,
+                    "GET /logs failed"
+            );
         } catch (Exception e) {
             throw wrap(e, "GET /logs failed");
         }
     }
 
     public Object nodeLogs(Long clientId) {
-        try {
-            return restTemplate.getForObject(url(clientId, "/log"), Object.class);
-        } catch (Exception e) {
-            throw wrap(e, "GET /log failed");
-        }
+        return get(
+                clientId,
+                url(clientId, "/log"),
+                Object.class,
+                "GET /log failed"
+        );
     }
 
     public String metrics(Long clientId, boolean openMetrics) {
-        try {
-            String path = openMetrics ? "/openmetrics" : "/metrics";
-            ResponseEntity<String> resp = restTemplate.exchange(
-                    url(clientId, path),
-                    HttpMethod.GET,
-                    new HttpEntity<Void>((Void) null, new HttpHeaders()),
-                    String.class
-            );
-            return resp.getBody();
-        } catch (Exception e) {
-            throw wrap(e, "GET /metrics failed");
-        }
+        String path = openMetrics ? "/openmetrics" : "/metrics";
+
+        return get(
+                clientId,
+                url(clientId, path),
+                String.class,
+                "GET /metrics failed"
+        );
     }
 
     /* ===================== POST ===================== */
@@ -171,27 +361,25 @@ public class SeaTunnelRestClient {
                              String jobName,
                              Boolean isStartWithSavePoint) {
         try {
-            if (format == null || format.trim().isEmpty()) {
+            if (isBlank(format)) {
                 format = "json";
             }
 
-            UriComponentsBuilder b = UriComponentsBuilder.fromHttpUrl(url(clientId, "/submit-job"))
-                    .queryParam("format", format);
+            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(url(clientId, "/submit-job"))
+                    .queryParam("format", format.trim());
 
-            if (jobId != null && !jobId.trim().isEmpty()) {
-                b.queryParam("jobId", jobId);
-            }
-            if (jobName != null && !jobName.trim().isEmpty()) {
-                b.queryParam("jobName", jobName);
-            }
-            if (isStartWithSavePoint != null) {
-                b.queryParam("isStartWithSavePoint", isStartWithSavePoint);
-            }
+            appendSubmitJobParams(builder, jobId, jobName, isStartWithSavePoint);
 
-            HttpEntity<String> entity = new HttpEntity<>(configText == null ? "" : configText, textHeaders());
-            return restTemplate.postForObject(b.build(true).toUri(), entity, Map.class);
+            return post(
+                    clientId,
+                    builder.build(true).toUriString(),
+                    configText == null ? "" : configText,
+                    textHeaders(clientId),
+                    Map.class,
+                    "POST /submit-job(text) failed"
+            );
         } catch (Exception e) {
-            throw wrap(e, e.getMessage());
+            throw wrap(e, "POST /submit-job(text) failed");
         }
     }
 
@@ -201,21 +389,19 @@ public class SeaTunnelRestClient {
                              String jobName,
                              Boolean isStartWithSavePoint) {
         try {
-            UriComponentsBuilder b = UriComponentsBuilder.fromHttpUrl(url(clientId, "/submit-job"))
+            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(url(clientId, "/submit-job"))
                     .queryParam("format", "json");
 
-            if (jobId != null && !jobId.trim().isEmpty()) {
-                b.queryParam("jobId", jobId);
-            }
-            if (jobName != null && !jobName.trim().isEmpty()) {
-                b.queryParam("jobName", jobName);
-            }
-            if (isStartWithSavePoint != null) {
-                b.queryParam("isStartWithSavePoint", isStartWithSavePoint);
-            }
+            appendSubmitJobParams(builder, jobId, jobName, isStartWithSavePoint);
 
-            HttpEntity<Object> entity = new HttpEntity<>(configJsonObject, jsonHeaders());
-            return restTemplate.postForObject(b.build(true).toUri(), entity, Map.class);
+            return post(
+                    clientId,
+                    builder.build(true).toUriString(),
+                    configJsonObject,
+                    jsonHeaders(clientId),
+                    Map.class,
+                    "POST /submit-job(json) failed"
+            );
         } catch (Exception e) {
             throw wrap(e, "POST /submit-job(json) failed");
         }
@@ -228,71 +414,95 @@ public class SeaTunnelRestClient {
             ByteArrayResource resource = new ByteArrayResource(fileBytes == null ? new byte[0] : fileBytes) {
                 @Override
                 public String getFilename() {
-                    return (filename == null || filename.isBlank()) ? "job.conf" : filename;
+                    return isBlank(filename) ? DEFAULT_CONFIG_FILE_NAME : filename.trim();
                 }
             };
 
             body.add("config_file", resource);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+            HttpEntity<MultiValueMap<String, Object>> request = new HttpEntity<>(
+                    body,
+                    multipartHeaders(clientId)
+            );
 
-            HttpEntity<MultiValueMap<String, Object>> req = new HttpEntity<>(body, headers);
-
-            ResponseEntity<Map> resp = restTemplate.exchange(
+            ResponseEntity<Map> response = restTemplate.exchange(
                     url(clientId, "/submit-job/upload"),
                     HttpMethod.POST,
-                    req,
+                    request,
                     Map.class
             );
-            return resp.getBody();
+
+            return response.getBody();
         } catch (Exception e) {
-            throw wrap(e, e.getMessage());
+            throw wrap(e, "POST /submit-job/upload failed");
         }
     }
 
     public List submitJobsBatch(Long clientId, List jobConfigs) {
-        try {
-            HttpEntity<Object> entity = new HttpEntity<>(jobConfigs, jsonHeaders());
-            ResponseEntity<List> resp = restTemplate.exchange(
-                    url(clientId, "/submit-jobs"),
-                    HttpMethod.POST,
-                    entity,
-                    List.class
-            );
-            return resp.getBody();
-        } catch (Exception e) {
-            throw wrap(e, "POST /submit-jobs failed");
-        }
+        return post(
+                clientId,
+                url(clientId, "/submit-jobs"),
+                jobConfigs,
+                jsonHeaders(clientId),
+                List.class,
+                "POST /submit-jobs failed"
+        );
     }
 
     public Map stopJob(Long clientId, long jobId, boolean isStopWithSavePoint) {
-        try {
-            Map<String, Object> body = new java.util.LinkedHashMap<>();
-            body.put("jobId", jobId);
-            body.put("isStopWithSavePoint", isStopWithSavePoint);
+        Map<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("jobId", jobId);
+        body.put("isStopWithSavePoint", isStopWithSavePoint);
 
-            HttpEntity<Object> entity = new HttpEntity<>(body, jsonHeaders());
-            return restTemplate.postForObject(url(clientId, "/stop-job"), entity, Map.class);
-        } catch (Exception e) {
-            throw wrap(e, "POST /stop-job failed");
-        }
+        return post(
+                clientId,
+                url(clientId, "/stop-job"),
+                body,
+                jsonHeaders(clientId),
+                Map.class,
+                "POST /stop-job failed"
+        );
     }
 
     public List stopJobsBatch(Long clientId, List<Map<String, Object>> items) {
-        try {
-            HttpEntity<Object> entity = new HttpEntity<>(items, jsonHeaders());
-            ResponseEntity<List> resp = restTemplate.exchange(
-                    url(clientId, "/stop-jobs"),
-                    HttpMethod.POST,
-                    entity,
-                    List.class
-            );
-            return resp.getBody();
-        } catch (Exception e) {
-            throw wrap(e, "POST /stop-jobs failed");
+        return post(
+                clientId,
+                url(clientId, "/stop-jobs"),
+                items,
+                jsonHeaders(clientId),
+                List.class,
+                "POST /stop-jobs failed"
+        );
+    }
+
+    /* ===================== Query Params ===================== */
+
+    private void appendQueryParams(UriComponentsBuilder builder, Map<String, String> params) {
+        if (params == null || params.isEmpty()) {
+            return;
+        }
+
+        for (Map.Entry<String, String> entry : params.entrySet()) {
+            if (!isBlank(entry.getKey()) && entry.getValue() != null) {
+                builder.queryParam(entry.getKey().trim(), entry.getValue());
+            }
         }
     }
 
+    private void appendSubmitJobParams(UriComponentsBuilder builder,
+                                       String jobId,
+                                       String jobName,
+                                       Boolean isStartWithSavePoint) {
+        if (!isBlank(jobId)) {
+            builder.queryParam("jobId", jobId.trim());
+        }
+
+        if (!isBlank(jobName)) {
+            builder.queryParam("jobName", jobName.trim());
+        }
+
+        if (isStartWithSavePoint != null) {
+            builder.queryParam("isStartWithSavePoint", isStartWithSavePoint);
+        }
+    }
 }
