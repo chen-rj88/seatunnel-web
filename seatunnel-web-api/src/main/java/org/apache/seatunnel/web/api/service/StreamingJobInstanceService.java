@@ -2,11 +2,12 @@ package org.apache.seatunnel.web.api.service;
 
 import org.apache.seatunnel.web.common.enums.JobMode;
 import org.apache.seatunnel.web.common.enums.RunMode;
-import org.apache.seatunnel.web.dao.entity.JobInstance;
+import org.apache.seatunnel.web.dao.entity.StreamingJobInstance;
 import org.apache.seatunnel.web.spi.bean.dto.SeaTunnelJobInstanceDTO;
 import org.apache.seatunnel.web.spi.bean.entity.PaginationResult;
 import org.apache.seatunnel.web.spi.bean.vo.JobInstanceVO;
 import org.apache.seatunnel.web.spi.bean.vo.JobTableMetricsVO;
+import org.apache.seatunnel.web.spi.bean.vo.StreamingInstanceMetricsDashboardVO;
 
 import java.util.List;
 
@@ -24,9 +25,11 @@ public interface StreamingJobInstanceService {
 
     void removeAllByDefinitionId(Long definitionId);
 
-    void updateById(JobInstance po);
+    void updateById(StreamingJobInstance po);
 
     List<JobTableMetricsVO> listTableMetrics(Long instanceId);
 
     List<JobInstanceVO> listRunningStreamingInstances();
+
+    StreamingInstanceMetricsDashboardVO getMetricsDashboard(Long instanceId, String range);
 }

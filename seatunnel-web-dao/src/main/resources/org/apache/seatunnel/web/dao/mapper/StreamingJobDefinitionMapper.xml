@@ -100,12 +100,12 @@
         LEFT JOIN (
         SELECT
         i.*
-        FROM t_seatunnel_job_instance i
+        FROM t_seatunnel_streaming_job_instance i
         INNER JOIN (
         SELECT
         job_definition_id,
         MAX(id) AS latest_instance_id
-        FROM t_seatunnel_job_instance
+        FROM t_seatunnel_streaming_job_instance
         GROUP BY job_definition_id
         ) latest
         ON latest.latest_instance_id = i.id

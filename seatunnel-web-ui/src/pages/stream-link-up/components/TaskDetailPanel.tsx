@@ -11,6 +11,7 @@ import TableTab from "./tabs/TableTab";
 import { seatunnelJobInstanceApi } from "../api";
 import TaskHeader from "@/pages/batch-link-up/TaskHeader";
 import BasicInfoSection from "@/pages/batch-link-up/BasicInfoSection";
+import { streamingSeatunnelJobInstanceApi } from "@/pages/batch-link-up/api";
 
 
 interface TaskDetailPanelProps {
@@ -28,7 +29,7 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ instanceItem }) => {
     try {
       setLogLoading(true);
 
-      const res = await seatunnelJobInstanceApi.getLog(instanceItem?.id);
+      const res = await streamingSeatunnelJobInstanceApi.getLog(instanceItem?.id);
 
       setLogContent(
         res?.data ||
@@ -96,14 +97,6 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ instanceItem }) => {
         defaultMessage: "Metrics",
       }),
       children: <MetricsTab instanceItem={instanceItem} />,
-    },
-    {
-      key: "schedule",
-      label: intl.formatMessage({
-        id: "pages.job.detail.tabs.schedule",
-        defaultMessage: "Scheduled",
-      }),
-      children: <ScheduleTab instanceItem={instanceItem} />,
     },
     ...(showTableTab
       ? [

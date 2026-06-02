@@ -258,7 +258,7 @@ const RealtimeSyncPage: React.FC = () => {
       const res = await seatunnelStremJobDefinitionApi.page(queryParams);
 
       if (res?.code !== undefined && res.code !== 0) {
-        message.error(res?.message || "查询实时任务列表失败");
+
         setDataSource([]);
         setPagination((prev) => ({
           ...prev,
@@ -275,7 +275,7 @@ const RealtimeSyncPage: React.FC = () => {
         total: nextTotal || 0,
       }));
     } catch (error) {
-      message.error("查询实时任务列表失败");
+
       setDataSource([]);
       setPagination((prev) => ({
         ...prev,
