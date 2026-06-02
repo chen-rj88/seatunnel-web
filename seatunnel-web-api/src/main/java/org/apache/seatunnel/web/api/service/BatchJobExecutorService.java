@@ -1,6 +1,9 @@
 package org.apache.seatunnel.web.api.service;
 
 import org.apache.seatunnel.web.common.enums.RunMode;
+import org.apache.seatunnel.web.spi.bean.vo.BatchJobOperateResultVO;
+
+import java.util.List;
 
 /**
  * Service interface for executing and managing SeaTunnel jobs.
@@ -24,5 +27,9 @@ public interface BatchJobExecutorService {
      * @return the job instance ID after pause operation
      */
     Long jobPause(Long jobInstanceId);
+
+    BatchJobOperateResultVO batchExecute(List<Long> jobDefinitionIds, RunMode runMode);
+
+    BatchJobOperateResultVO batchPause(List<Long> jobDefinitionIds);
 
 }

@@ -1,5 +1,6 @@
 package org.apache.seatunnel.web.dao.repository.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.Resource;
 import lombok.NonNull;
 import org.apache.seatunnel.web.common.enums.ReleaseState;
@@ -11,7 +12,9 @@ import org.apache.seatunnel.web.spi.bean.dto.BatchJobDefinitionQueryDTO;
 import org.apache.seatunnel.web.spi.bean.vo.BatchJobDefinitionVO;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Repository
 public class JobDefinitionDaoImpl
@@ -55,5 +58,31 @@ public class JobDefinitionDaoImpl
         entity.initUpdate();
 
         return this.updateById(entity);
+    }
+
+    @Override
+    public List<JobDefinitionEntity> listByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> validIds = ids.stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (validIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        LambdaQueryWrapper<JobDefinitionEntity> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(JobDefinitionEntity::getId, validIds);
+
+        List<JobDefinitionEntity> records = jobDefinitionMapper.selectList(wrapper);
+        if (records == null || records.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return records;
     }
 }

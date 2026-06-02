@@ -4,17 +4,15 @@ import { TableRowSelection } from "antd/es/table/interface";
 import moment from "moment";
 import { useEffect, useMemo, useState } from "react";
 import { seatunnelJobDefinitionApi } from "../../api";
-import DataSourceSyncPlan from "./components/DataSourceSyncPlan";
-import TaskStatus from "./components/TaskStatus";
-import ExecutionStatus from "./components/ExecutionStatus";
-import ScheduleInfo from "./components/ScheduleInfo";
+import { batchJobExecutorApi } from "../../type";
 import ActionColumn from "./components/ActionColumn";
-import { taskExecutionApi } from "../../type";
-import BottomActionBar from "./components/BottomActionBar";
-import Footer from "./components/Footer";
 import AdvancedSearchForm from "./components/AdvancedSearchForm";
-
-
+import BottomActionBar from "./components/BottomActionBar";
+import DataSourceSyncPlan from "./components/DataSourceSyncPlan";
+import ExecutionStatus from "./components/ExecutionStatus";
+import Footer from "./components/Footer";
+import ScheduleInfo from "./components/ScheduleInfo";
+import TaskStatus from "./components/TaskStatus";
 
 interface Props {
   goDetail: (value: any, item?: any) => void;
@@ -24,6 +22,17 @@ const DEFAULT_TIME_RANGE = [
   moment().subtract(4, "days"),
   moment().add(1, "days"),
 ];
+
+const RUNNING_STATUS_SET = new Set([
+  "INITIALIZING",
+  "CREATED",
+  "PENDING",
+  "SCHEDULED",
+  "RUNNING",
+  "FAILING",
+  "DOING_SAVEPOINT",
+  "CANCELING",
+]);
 
 const parseSearchParamsFromUrl = () => {
   const params = new URLSearchParams(window.location.search);
@@ -131,6 +140,7 @@ const App: React.FC<Props> = ({ goDetail }) => {
         total: data?.data?.pagination?.total || 0,
       }));
     } catch (error) {
+      message.error("查询任务列表失败");
     } finally {
       setLoading(false);
     }
@@ -201,7 +211,9 @@ const App: React.FC<Props> = ({ goDetail }) => {
             })}
           </em>
           :{" "}
-          <span style={{ fontSize: "12px", color: "gray" }}>{record?.id}</span>{" "}
+          <span style={{ fontSize: "12px", color: "gray" }}>
+            {record?.id}
+          </span>{" "}
           <br />
           <em style={{ fontWeight: 500 }}>
             {intl.formatMessage({
@@ -222,7 +234,7 @@ const App: React.FC<Props> = ({ goDetail }) => {
       width: "21%",
       render: (_content: any, record: any) => (
         <DataSourceSyncPlan record={record} />
-      ), 
+      ),
     },
     {
       title: intl.formatMessage({
@@ -319,65 +331,195 @@ const App: React.FC<Props> = ({ goDetail }) => {
 
   const hasSelected = selectedRowKeys.length > 0;
 
+  const getSelectedRows = () => {
+    const selectedKeySet = new Set(selectedRowKeys.map(String));
+    return taskList.filter((item) => selectedKeySet.has(String(item?.id)));
+  };
+
+  const isOnline = (record: any) => {
+    return String(record?.releaseState || "").toUpperCase() === "ONLINE";
+  };
+
+  const isRunning = (record: any) => {
+    return RUNNING_STATUS_SET.has(
+      String(record?.lastJobStatus || "").toUpperCase()
+    );
+  };
+
+  const buildJobLabel = (record: any) => {
+    return `${record?.jobName || "-"}(${record?.id || "-"})`;
+  };
+
+  const buildLimitedJobLabels = (records: any[]) => {
+    const labels = records.slice(0, 3).map(buildJobLabel).join("、");
+    if (records.length <= 3) {
+      return labels;
+    }
+    return `${labels} 等 ${records.length} 个任务`;
+  };
+
+  const getBatchActionState = () => {
+    const selectedRows = getSelectedRows();
+
+    if (selectedRows.length === 0) {
+      return {
+        startDisabled: true,
+        stopDisabled: true,
+        startTooltip: "请先选择任务",
+        stopTooltip: "请先选择任务",
+      };
+    }
+
+    const offlineRows = selectedRows.filter((item) => !isOnline(item));
+    const runningRows = selectedRows.filter(isRunning);
+    const notRunningRows = selectedRows.filter((item) => !isRunning(item));
+
+    const startDisabled = offlineRows.length > 0 || runningRows.length > 0;
+    const stopDisabled = notRunningRows.length > 0;
+
+    let startTooltip: string | undefined;
+    let stopTooltip: string | undefined;
+
+    if (offlineRows.length > 0) {
+      startTooltip = `存在未上线任务，请先上线后再启动：${buildLimitedJobLabels(
+        offlineRows
+      )}`;
+    } else if (runningRows.length > 0) {
+      startTooltip = `存在运行中的任务，请只选择未运行任务进行启动：${buildLimitedJobLabels(
+        runningRows
+      )}`;
+    }
+
+    if (notRunningRows.length > 0) {
+      stopTooltip = `存在未运行任务，请只选择运行中的任务进行停止：${buildLimitedJobLabels(
+        notRunningRows
+      )}`;
+    }
+
+    return {
+      startDisabled,
+      stopDisabled,
+      startTooltip,
+      stopTooltip,
+    };
+  };
+
+  const batchActionState = getBatchActionState();
+
+  const validateBatchStart = () => {
+    const selectedRows = getSelectedRows();
+
+    if (selectedRows.length === 0) {
+      message.warning("请先选择要启动的任务");
+      return false;
+    }
+
+    const offlineRows = selectedRows.filter((item) => !isOnline(item));
+    if (offlineRows.length > 0) {
+      message.warning(
+        `存在未上线任务，请先上线后再启动：${buildLimitedJobLabels(
+          offlineRows
+        )}`
+      );
+      return false;
+    }
+
+    const runningRows = selectedRows.filter(isRunning);
+    if (runningRows.length > 0) {
+      message.warning(
+        `存在运行中的任务，请只选择未运行任务进行批量启动：${buildLimitedJobLabels(
+          runningRows
+        )}`
+      );
+      return false;
+    }
+
+    return true;
+  };
+
+  const validateBatchStop = () => {
+    const selectedRows = getSelectedRows();
+
+    if (selectedRows.length === 0) {
+      message.warning("请先选择要停止的任务");
+      return false;
+    }
+
+    const notRunningRows = selectedRows.filter((item) => !isRunning(item));
+    if (notRunningRows.length > 0) {
+      message.warning(
+        `存在未运行的任务，请只选择运行中的任务进行批量停止：${buildLimitedJobLabels(
+          notRunningRows
+        )}`
+      );
+      return false;
+    }
+
+    return true;
+  };
+
+  const getErrorMessage = (error: any, fallback: string) => {
+    return (
+      error?.response?.data?.message ||
+      error?.response?.data?.msg ||
+      error?.data?.message ||
+      error?.data?.msg ||
+      error?.message ||
+      fallback
+    );
+  };
+
   const onStartAll = async () => {
+    if (!validateBatchStart()) {
+      return;
+    }
+
     try {
-      const data = await taskExecutionApi.batchExecute(selectedRowKeys);
+      const data = await batchJobExecutorApi.batchExecute(selectedRowKeys);
 
       if (data?.code === 0) {
+        const result = data?.data;
+
         message.success(
-          intl.formatMessage({
-            id: "pages.job.batch.start.success",
-            defaultMessage: "Start all succeeded",
-          })
+          `批量启动完成：成功 ${result?.successCount || 0} 个，失败 ${
+            result?.failedCount || 0
+          } 个`
         );
+
         setSelectedRowKeys([]);
         fetchTaskList();
       } else {
-        message.error(
-          intl.formatMessage({
-            id: "pages.job.batch.start.fail",
-            defaultMessage: "Start all failed",
-          })
-        );
+        message.error(data?.message || data?.msg || "Start all failed");
       }
-    } catch (error) {
-      message.error(
-        intl.formatMessage({
-          id: "pages.job.batch.start.fail",
-          defaultMessage: "Start all failed",
-        })
-      );
+    } catch (error: any) {
+      message.error(getErrorMessage(error, "Start all failed"));
     }
   };
 
   const onStopAll = async () => {
+    if (!validateBatchStop()) {
+      return;
+    }
+
     try {
-      const data = await taskExecutionApi.batchCancel(selectedRowKeys);
+      const data = await batchJobExecutorApi.batchPause(selectedRowKeys);
 
       if (data?.code === 0) {
+        const result = data?.data;
+
         message.success(
-          intl.formatMessage({
-            id: "pages.job.batch.stop.success",
-            defaultMessage: "Stop all succeeded",
-          })
+          `批量停止完成：成功 ${result?.successCount || 0} 个，失败 ${
+            result?.failedCount || 0
+          } 个`
         );
+
         setSelectedRowKeys([]);
         fetchTaskList();
       } else {
-        message.error(
-          intl.formatMessage({
-            id: "pages.job.batch.stop.fail",
-            defaultMessage: "Stop all failed",
-          })
-        );
+        message.error(data?.message || data?.msg || "Stop all failed");
       }
-    } catch (error) {
-      message.error(
-        intl.formatMessage({
-          id: "pages.job.batch.stop.fail",
-          defaultMessage: "Stop all failed",
-        })
-      );
+    } catch (error: any) {
+      message.error(getErrorMessage(error, "Stop all failed"));
     }
   };
 
@@ -427,7 +569,12 @@ const App: React.FC<Props> = ({ goDetail }) => {
           ...pagination,
           onChange: handlePaginationChange,
         }}
+        selectedCount={selectedRowKeys.length}
         disabled={!hasSelected}
+        startDisabled={batchActionState.startDisabled}
+        stopDisabled={batchActionState.stopDisabled}
+        startTooltip={batchActionState.startTooltip}
+        stopTooltip={batchActionState.stopTooltip}
       />
     </>
   );
