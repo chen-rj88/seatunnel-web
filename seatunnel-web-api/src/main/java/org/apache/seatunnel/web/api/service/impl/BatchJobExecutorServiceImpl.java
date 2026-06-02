@@ -1,7 +1,7 @@
 package org.apache.seatunnel.web.api.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
-import org.apache.seatunnel.web.api.metrics.JobSubmitter;
+import org.apache.seatunnel.web.api.metrics.BatchJobSubmitter;
 import org.apache.seatunnel.web.api.service.BatchJobExecutorService;
 import org.apache.seatunnel.web.api.service.BatchJobInstanceService;
 import org.apache.seatunnel.web.common.enums.JobStatus;
@@ -20,10 +20,10 @@ import java.util.Date;
 public class BatchJobExecutorServiceImpl implements BatchJobExecutorService {
 
     private final BatchJobInstanceService instanceService;
-    private final JobSubmitter jobSubmitter;
+    private final BatchJobSubmitter jobSubmitter;
 
     public BatchJobExecutorServiceImpl(BatchJobInstanceService instanceService,
-                                       JobSubmitter jobSubmitter) {
+                                       BatchJobSubmitter jobSubmitter) {
         this.instanceService = instanceService;
         this.jobSubmitter = jobSubmitter;
     }

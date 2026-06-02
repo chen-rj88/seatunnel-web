@@ -1,7 +1,7 @@
 package org.apache.seatunnel.web.api.service.impl;
 
 import lombok.extern.slf4j.Slf4j;
-import org.apache.seatunnel.web.api.metrics.JobSubmitter;
+import org.apache.seatunnel.web.api.metrics.streaming.StreamingJobSubmitter;
 import org.apache.seatunnel.web.api.service.StreamingJobExecutorService;
 import org.apache.seatunnel.web.api.service.StreamingJobInstanceService;
 import org.apache.seatunnel.web.common.enums.JobMode;
@@ -9,8 +9,8 @@ import org.apache.seatunnel.web.common.enums.JobStatus;
 import org.apache.seatunnel.web.common.enums.ReleaseState;
 import org.apache.seatunnel.web.common.enums.RunMode;
 import org.apache.seatunnel.web.core.exceptions.ServiceException;
-import org.apache.seatunnel.web.dao.entity.JobInstance;
 import org.apache.seatunnel.web.dao.entity.StreamingJobDefinitionEntity;
+import org.apache.seatunnel.web.dao.entity.StreamingJobInstance;
 import org.apache.seatunnel.web.spi.bean.vo.JobInstanceVO;
 import org.apache.seatunnel.web.spi.enums.Status;
 import org.springframework.stereotype.Service;
@@ -24,14 +24,14 @@ public class StreamingJobExecutorServiceImpl implements StreamingJobExecutorServ
 
     private final StreamingJobInstanceService streamingJobInstanceService;
     private final StreamingJobDefinitionQueryService streamingJobDefinitionQueryService;
-    private final JobSubmitter jobSubmitter;
+    private final StreamingJobSubmitter streamingJobSubmitter;
 
     public StreamingJobExecutorServiceImpl(StreamingJobInstanceService streamingJobInstanceService,
                                            StreamingJobDefinitionQueryService streamingJobDefinitionQueryService,
-                                           JobSubmitter jobSubmitter) {
+                                           StreamingJobSubmitter streamingJobSubmitter) {
         this.streamingJobInstanceService = streamingJobInstanceService;
         this.streamingJobDefinitionQueryService = streamingJobDefinitionQueryService;
-        this.jobSubmitter = jobSubmitter;
+        this.streamingJobSubmitter = streamingJobSubmitter;
     }
 
     @Override
@@ -51,7 +51,7 @@ public class StreamingJobExecutorServiceImpl implements StreamingJobExecutorServ
         log.info("Streaming job execute requested: jobDefineId={}, runMode={}, instanceId={}",
                 jobDefineId, runMode, instance.getId());
 
-        jobSubmitter.submit(instance);
+        streamingJobSubmitter.submit(instance);
 
         return instance.getId();
     }
@@ -76,9 +76,9 @@ public class StreamingJobExecutorServiceImpl implements StreamingJobExecutorServ
                 jobInstanceId, instance.getJobStatus());
 
         try {
-            jobSubmitter.pause(instance);
+            streamingJobSubmitter.pause(instance);
 
-            JobInstance update = new JobInstance();
+            StreamingJobInstance update = new StreamingJobInstance();
             update.setId(jobInstanceId);
             update.setJobStatus(JobStatus.CANCELED);
             update.setEndTime(new Date());
@@ -93,9 +93,10 @@ public class StreamingJobExecutorServiceImpl implements StreamingJobExecutorServ
         } catch (Exception e) {
             log.error("Streaming job pause failed: instanceId={}", jobInstanceId, e);
 
-            JobInstance update = new JobInstance();
+            StreamingJobInstance update = new StreamingJobInstance();
             update.setId(jobInstanceId);
             update.setErrorMessage("Streaming job pause failed: " + e.getMessage());
+
             streamingJobInstanceService.updateById(update);
 
             throw new ServiceException(Status.JOB_DEFINITION_EXECUTE_ERROR);
@@ -107,10 +108,7 @@ public class StreamingJobExecutorServiceImpl implements StreamingJobExecutorServ
                 streamingJobDefinitionQueryService.getDefinitionOrThrow(jobDefineId);
 
         if (definition.getReleaseState() == null) {
-            throw new ServiceException(
-                    Status.REQUEST_PARAMS_NOT_VALID_ERROR,
-                    "releaseState"
-            );
+            throw new ServiceException(Status.REQUEST_PARAMS_NOT_VALID_ERROR, "releaseState");
         }
 
         if (definition.getReleaseState() != ReleaseState.ONLINE) {

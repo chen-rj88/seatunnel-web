@@ -78,6 +78,8 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
   onCheckpoint,
 }) => {
   const [runOpen, setRunOpen] = useState(false);
+  const [offlineOpen, setOfflineOpen] = useState(false);
+
   const [runLoading, setRunLoading] = useState(false);
   const [stopLoading, setStopLoading] = useState(false);
   const [onlineLoading, setOnlineLoading] = useState(false);
@@ -86,7 +88,8 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
   const isOnline = isReleaseOnline(record.releaseState);
   const isRunning = record.lastJobStatus === "RUNNING";
 
-  const canRun = isOnline;
+  const canRun = isOnline && !isRunning;
+  const canOffline = isOnline && !isRunning;
 
   const stopPropagation = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
@@ -94,7 +97,14 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
 
   const handleRun = async () => {
     if (!canRun) {
-      message.warning("请先上线任务，再执行运行操作");
+      if (!isOnline) {
+        message.warning("请先上线任务，再执行运行操作");
+      }
+
+      if (isRunning) {
+        message.warning("任务正在运行中");
+      }
+
       return;
     }
 
@@ -126,9 +136,18 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
   };
 
   const handleOffline = async () => {
+    if (!canOffline) {
+      if (isRunning) {
+        message.warning("任务正在运行中，请先停止任务后再下线");
+      }
+
+      return;
+    }
+
     try {
       setOfflineLoading(true);
       await onOffline?.(record);
+      setOfflineOpen(false);
     } finally {
       setOfflineLoading(false);
     }
@@ -171,7 +190,14 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
           open={canRun ? runOpen : false}
           onOpenChange={(open) => {
             if (!canRun) {
-              message.warning("请先上线任务，再执行运行操作");
+              if (!isOnline) {
+                message.warning("请先上线任务，再执行运行操作");
+              }
+
+              if (isRunning) {
+                message.warning("任务正在运行中");
+              }
+
               return;
             }
 
@@ -197,13 +223,18 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
         >
           <button
             type="button"
-            disabled={!canRun}
             className={canRun ? primaryActionClass : disabledActionClass}
             onClick={(event) => {
               event.stopPropagation();
 
               if (!canRun) {
-                message.warning("请先上线任务，再执行运行操作");
+                if (!isOnline) {
+                  message.warning("请先上线任务，再执行运行操作");
+                }
+
+                if (isRunning) {
+                  message.warning("任务正在运行中");
+                }
               }
             }}
           >
@@ -216,6 +247,20 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
       {isOnline ? (
         <Popconfirm
           title="任务下线"
+          open={canOffline ? offlineOpen : false}
+          onOpenChange={(open) => {
+            if (!canOffline) {
+              if (isRunning) {
+               
+              }
+
+              return;
+            }
+
+            if (!offlineLoading) {
+              setOfflineOpen(open);
+            }
+          }}
           description={
             <div className="mr-3">
               下线后任务将不会再被调度触发，
@@ -234,8 +279,18 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
         >
           <button
             type="button"
-            className={secondaryActionClass}
-            onClick={stopPropagation}
+            className={canOffline ? secondaryActionClass : disabledActionClass}
+            onClick={(event) => {
+              event.stopPropagation();
+
+              if (!canOffline) {
+                if (isRunning) {
+                  message.warning("任务正在运行中，请先停止任务后再下线");
+                }
+
+                return;
+              }
+            }}
           >
             <CloudDownloadOutlined />
             下线
