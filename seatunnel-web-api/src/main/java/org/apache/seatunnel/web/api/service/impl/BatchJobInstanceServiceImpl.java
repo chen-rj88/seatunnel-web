@@ -237,6 +237,20 @@ public class BatchJobInstanceServiceImpl implements BatchJobInstanceService {
         }
     }
 
+    @Override
+    public List<JobInstance> listRunningInstanceByDefinitionIds(List<Long> definitionIds) {
+        if (definitionIds == null || definitionIds.isEmpty()) {
+            return List.of();
+        }
+
+        try {
+            return jobInstanceDao.selectRunningInstanceByDefinitionIds(definitionIds);
+        } catch (Exception e) {
+            log.error("Query running batch job instances failed, definitionIds={}", definitionIds, e);
+            throw new ServiceException(Status.QUERY_BATCH_JOB_INSTANCE_ERROR);
+        }
+    }
+
     /**
      * Load persisted definition command for instance creation.
      */

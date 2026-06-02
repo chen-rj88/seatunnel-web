@@ -167,6 +167,42 @@ public class JobInstanceDaoImpl
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public List<JobInstance> selectRunningInstanceByDefinitionIds(List<Long> definitionIds) {
+        if (definitionIds == null || definitionIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> validDefinitionIds = definitionIds.stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (validDefinitionIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        LambdaQueryWrapper<JobInstance> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(JobInstance::getJobDefinitionId, validDefinitionIds)
+                .in(JobInstance::getJobStatus,
+                        JobStatus.INITIALIZING,
+                        JobStatus.CREATED,
+                        JobStatus.PENDING,
+                        JobStatus.SCHEDULED,
+                        JobStatus.RUNNING,
+                        JobStatus.FAILING,
+                        JobStatus.DOING_SAVEPOINT,
+                        JobStatus.CANCELING)
+                .orderByDesc(JobInstance::getCreateTime);
+
+        List<JobInstance> records = jobInstanceMapper.selectList(wrapper);
+        if (records == null || records.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        return records;
+    }
+
     private String truncate(String text, int maxLength) {
         if (text == null) {
             return null;

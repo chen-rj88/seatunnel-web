@@ -292,6 +292,58 @@ public class BatchJobDefinitionServiceImpl extends BaseServiceImpl implements Ba
         throw new RuntimeException("Unsupported release state: " + releaseState);
     }
 
+    @Override
+    public List<BatchJobDefinitionVO> listByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> validIds = ids.stream()
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .collect(java.util.stream.Collectors.toList());
+
+        if (validIds.isEmpty()) {
+            return List.of();
+        }
+
+        try {
+            List<JobDefinitionEntity> records = jobDefinitionDao.listByIds(validIds);
+
+            if (records == null || records.isEmpty()) {
+                return List.of();
+            }
+
+            return records.stream()
+                    .map(item -> {
+                        BatchJobDefinitionVO vo = new BatchJobDefinitionVO();
+                        vo.setId(item.getId());
+                        vo.setJobName(item.getJobName());
+                        vo.setJobDesc(item.getJobDesc());
+                        vo.setMode(item.getMode());
+                        vo.setJobType(item.getJobType());
+                        vo.setClientId(item.getClientId());
+                        vo.setJobVersion(item.getJobVersion());
+                        vo.setReleaseState(item.getReleaseState());
+                        vo.setSourceType(item.getSourceType());
+                        vo.setSinkType(item.getSinkType());
+                        vo.setSourceDatasourceId(item.getSourceDatasourceId());
+                        vo.setSinkDatasourceId(item.getSinkDatasourceId());
+                        vo.setSourceTable(item.getSourceTable());
+                        vo.setSinkTable(item.getSinkTable());
+                        vo.setCreateTime(item.getCreateTime());
+                        vo.setUpdateTime(item.getUpdateTime());
+                        return vo;
+                    })
+                    .collect(java.util.stream.Collectors.toList());
+        } catch (ServiceException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("List batch job definitions by ids failed, ids={}", validIds, e);
+            throw new ServiceException(Status.QUERY_BATCH_JOB_DEFINITION_ERROR);
+        }
+    }
+
     /**
      * Validate whether job definition can be edited.
      */

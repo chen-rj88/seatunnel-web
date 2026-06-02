@@ -27,4 +27,6 @@ public interface JobInstanceDao extends IDao<JobInstance> {
     void updateSubmitResult(Long instanceId, Long engineJobId, JobStatus submitStatus, Date submitTime);
 
     List<JobInstanceVO> listRunningByJobType(JobMode jobMode);
+
+    List<JobInstance> selectRunningInstanceByDefinitionIds(List<Long> definitionIds);
 }

@@ -32,4 +32,6 @@ public interface BatchJobInstanceService {
      * Query table level metrics for one job instance.
      */
     List<JobTableMetricsVO> listTableMetrics(Long instanceId);
+
+    List<JobInstance> listRunningInstanceByDefinitionIds(List<Long> definitionIds);
 }

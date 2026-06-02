@@ -20,4 +20,6 @@ public interface JobDefinitionDao extends IDao<JobDefinitionEntity> {
     Long count(BatchJobDefinitionQueryDTO dto);
 
     boolean updateReleaseState(Long id, ReleaseState releaseState);
+
+    List<JobDefinitionEntity> listByIds(List<Long> ids);
 }

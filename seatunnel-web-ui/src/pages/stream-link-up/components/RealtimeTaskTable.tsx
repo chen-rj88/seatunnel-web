@@ -149,10 +149,10 @@ const RealtimeTaskTable: React.FC<RealtimeTaskTableProps> = ({
       pagination={pagination}
       scroll={{ x: 1480 }}
       bordered
-      rowSelection={{
-        selectedRowKeys,
-        onChange: onSelectedRowKeysChange,
-      }}
+      // rowSelection={{
+      //   selectedRowKeys,
+      //   onChange: onSelectedRowKeysChange,
+      // }}
       className={[
         "[&_.ant-table]:!rounded-xl",
         "[&_.ant-table-thead>tr>th]:!bg-slate-50",
