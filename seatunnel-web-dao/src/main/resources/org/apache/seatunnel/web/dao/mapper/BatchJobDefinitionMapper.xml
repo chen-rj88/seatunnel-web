@@ -56,7 +56,7 @@
         FROM
         (
         SELECT *
-        FROM t_seatunnel_job_definition
+        FROM t_seatunnel_web_job_definition
         <where>
             <if test="dto.id != null">
                 AND id = #{dto.id}
@@ -97,22 +97,22 @@
         PARTITION BY job_definition_id
         ORDER BY start_time DESC
         ) rn
-        FROM t_seatunnel_job_instance
+        FROM t_seatunnel_web_job_instance
         ) t
         WHERE rn = 1
         ) i
         ON d.id = i.job_definition_id
 
-        LEFT JOIN t_seatunnel_job_metrics m
+        LEFT JOIN t_seatunnel_web_job_metrics m
         ON i.id = m.job_instance_id
 
-        LEFT JOIN t_seatunnel_job_schedule s
+        LEFT JOIN t_seatunnel_web_job_schedule s
         ON d.id = s.job_definition_id
 
-        -- Join t_seatunnel_datasource for source and sink names
-        LEFT JOIN t_seatunnel_datasource ds_source
+
+        LEFT JOIN t_seatunnel_web_datasource ds_source
         ON d.source_datasource_id = ds_source.id
-        LEFT JOIN t_seatunnel_datasource ds_sink
+        LEFT JOIN t_seatunnel_web_datasource ds_sink
         ON d.sink_datasource_id = ds_sink.id
 
         <where>
@@ -126,7 +126,7 @@
 
     <select id="selectDefinitionCount" resultType="java.lang.Long">
         SELECT COUNT(1)
-        FROM t_seatunnel_job_definition d
+        FROM t_seatunnel_web_job_definition d
         LEFT JOIN
         (
         SELECT *
@@ -137,7 +137,7 @@
         PARTITION BY job_definition_id
         ORDER BY start_time DESC
         ) rn
-        FROM t_seatunnel_job_instance
+        FROM t_seatunnel_web_job_instance
         ) t
         WHERE rn = 1
         ) i
