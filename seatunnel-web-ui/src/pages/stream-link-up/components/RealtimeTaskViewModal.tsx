@@ -1,15 +1,7 @@
 import HttpUtils from "@/utils/HttpUtils";
-import { Empty, Modal, Select, Spin, Tag, message } from "antd";
+import { Empty, Modal, Select, Spin, message } from "antd";
 import ReactECharts from "echarts-for-react";
-import {
-  Activity,
-  Clock3,
-  Database,
-  Gauge,
-  RefreshCw,
-  X,
-  Zap,
-} from "lucide-react";
+import { Activity, Clock3, Gauge, RefreshCw, X, Zap } from "lucide-react";
 import React, {
   forwardRef,
   useCallback,
@@ -20,6 +12,7 @@ import React, {
   useState,
 } from "react";
 import CountUp from "react-countup";
+import TaskStatus from "./TaskStatus";
 
 type RealtimeGrafanaLightModalRef = {
   onOpen: (visible: boolean, record?: Partial<JobInstanceVO>) => void;
@@ -389,8 +382,8 @@ const RealtimeGrafanaLightModal = forwardRef<
         <div className="flex h-full flex-col">
           <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
             <div className="flex min-w-0 items-center gap-4">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600">
-                <Database className="h-5 w-5" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600">
+                <Gauge className="h-5 w-5" />
               </div>
 
               <div className="min-w-0">
@@ -399,7 +392,7 @@ const RealtimeGrafanaLightModal = forwardRef<
                     {viewData.jobName}
                   </h1>
 
-                  <StatusTag status={viewData.status} />
+                  <TaskStatus status={viewData.status} />
                 </div>
 
                 <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
@@ -413,7 +406,7 @@ const RealtimeGrafanaLightModal = forwardRef<
 
             <div className="flex shrink-0 items-center gap-3">
               <Select
-                size="small"
+                // size="small"
                 value={range}
                 onChange={setRange}
                 className="w-[132px]"
@@ -428,13 +421,13 @@ const RealtimeGrafanaLightModal = forwardRef<
               <button
                 type="button"
                 onClick={() => fetchDashboard(false)}
-                className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-500 transition hover:bg-white hover:text-slate-900 md:flex"
+                className="hidden items-center gap-2  border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-500 transition hover:bg-white hover:text-slate-900 md:flex"
+                style={{ borderRadius: "16px", height: 33 }}
               >
                 <RefreshCw
-                  className={[
-                    "h-3.5 w-3.5",
-                    loading ? "animate-spin" : "",
-                  ].join(" ")}
+                  className={["h-4 w-4", loading ? "animate-spin" : ""].join(
+                    " "
+                  )}
                 />
                 <span>5s refresh</span>
               </button>
@@ -602,55 +595,6 @@ const RealtimeGrafanaLightModal = forwardRef<
 RealtimeGrafanaLightModal.displayName = "RealtimeGrafanaLightModal";
 
 export default RealtimeGrafanaLightModal;
-
-const StatusTag: React.FC<{ status?: string }> = ({ status }) => {
-  const finalStatus = status || "UNKNOWN";
-
-  const config: Record<
-    string,
-    {
-      text: string;
-      className: string;
-      color?: string;
-    }
-  > = {
-    RUNNING: {
-      text: "RUNNING",
-      color: "success",
-      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    },
-    FINISHED: {
-      text: "FINISHED",
-      color: "success",
-      className: "border-blue-200 bg-blue-50 text-blue-700",
-    },
-    FAILED: {
-      text: "FAILED",
-      color: "error",
-      className: "border-red-200 bg-red-50 text-red-700",
-    },
-    CANCELED: {
-      text: "CANCELED",
-      color: "default",
-      className: "border-slate-200 bg-slate-50 text-slate-600",
-    },
-  };
-
-  const item = config[finalStatus] || {
-    text: finalStatus,
-    color: "default",
-    className: "border-slate-200 bg-slate-50 text-slate-600",
-  };
-
-  return (
-    <Tag
-      color={item.color}
-      className={["m-0 rounded-md px-2", item.className].join(" ")}
-    >
-      {item.text}
-    </Tag>
-  );
-};
 
 const LightPanel: React.FC<{
   title: string;
