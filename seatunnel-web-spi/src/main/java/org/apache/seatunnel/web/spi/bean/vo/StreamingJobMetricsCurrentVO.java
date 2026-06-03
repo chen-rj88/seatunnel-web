@@ -6,19 +6,17 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
-public class JobTableMetricsVO {
-
-    private Long id;
+public class StreamingJobMetricsCurrentVO {
 
     private Long jobInstanceId;
 
     private Long jobDefinitionId;
 
-    private Integer pipelineId;
+    private Long engineJobId;
 
-    private String sourceTable;
+    private Long clientId;
 
-    private String sinkTable;
+    private String jobStatus;
 
     private Long readRowCount;
 
@@ -36,13 +34,17 @@ public class JobTableMetricsVO {
 
     private BigDecimal writeBps;
 
-    private Long rowDiff;
+    private Long intermediateQueueSize;
 
-    private String status;
+    private Long lagCount;
 
-    private String errorMsg;
+    private Long recordDelay;
 
-    private Date createTime;
+    private Integer pipelineCount;
 
-    private Date updateTime;
+    private Integer tableCount;
+
+    private Long lastCollectTimeMs;
+
+    private Date lastCollectTime;
 }

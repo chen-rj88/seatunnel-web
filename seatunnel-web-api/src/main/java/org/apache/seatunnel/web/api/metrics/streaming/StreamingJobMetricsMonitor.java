@@ -182,6 +182,56 @@ public class StreamingJobMetricsMonitor {
         log.info("Streaming metrics monitor cleaned, instanceId={}", instanceId);
     }
 
+    public void finalizeAndPersist(Long instanceId, String finalStatus) {
+        JobRuntimeContext context = monitoringJobs.get(instanceId);
+
+        if (context == null) {
+            log.warn("Streaming metrics monitor context not found when finalizing, instanceId={}", instanceId);
+            cleanup(instanceId);
+            return;
+        }
+
+        try {
+            StreamingParsedJobMetrics parsed =
+                    streamingJobMetricsService.getRealtimeMetricsFromEngine(
+                            context.getClientId(),
+                            context.getEngineId()
+                    );
+
+            if (parsed != null && !parsed.isEmpty()) {
+                streamingJobMetricsService.saveSnapshot(
+                        context.getInstanceId(),
+                        context.getJobDefinitionId(),
+                        context.getClientId(),
+                        context.getEngineId(),
+                        parsed
+                );
+
+                JobFileLogger logger = loggers.get(instanceId);
+                if (logger != null) {
+                    logger.info("Final Streaming Metrics Snapshot: " + parsed);
+                }
+
+                log.info("Final streaming metrics persisted, instanceId={}, engineId={}, status={}",
+                        instanceId, context.getEngineId(), finalStatus);
+            }
+
+            sendFinalEvent(instanceId, context.getEngineId(), finalStatus);
+        } catch (Exception e) {
+            log.warn("Failed to finalize streaming metrics, instanceId={}", instanceId, e);
+
+            if (context.getEngineId() != null) {
+                sendFinalEvent(instanceId, context.getEngineId(), "FAILED");
+            }
+        } finally {
+            cleanup(instanceId);
+        }
+    }
+
+    public void finalizeAndPersist(Long instanceId) {
+        finalizeAndPersist(instanceId, "FINISHED");
+    }
+
     private void handleEmptyMetrics(Long instanceId, JobRuntimeContext context, MonitorState state) {
         state.setEmptyTimes(state.getEmptyTimes() + 1);
 

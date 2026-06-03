@@ -92,36 +92,19 @@ export const taskScheduleApi = {
 };
 
 
-export const apiPrefixExecution = "/api/v1/task-execution"
 
-export const taskExecutionApi = {
-    // 新增任务定义
-    execute: (definiitionId: string) => {
-        return HttpUtils.get(apiPrefixExecution + `/${definiitionId}/execute`);
-    },
+export const apiPrefixExecutor = "/api/v1/executor";
 
-    batchExecute: (definiitionIds: any[]) => {
-        return HttpUtils.post(apiPrefixExecution + `/batch-execute`, definiitionIds);
-    },
+export const batchJobExecutorApi = {
+  batchExecute: (jobDefinitionIds: React.Key[]): any => {
+    return HttpUtils.post(`${apiPrefixExecutor}/batch-execute`, {
+      jobDefinitionIds: jobDefinitionIds.map(Number),
+    });
+  },
 
-    cancel: (executionId: string) => {
-        return HttpUtils.get(apiPrefixExecution + `/${executionId}/cancel`);
-    },
-
-    batchCancel: (definiitionIds: any[]) => {
-        return HttpUtils.post(apiPrefixExecution + `/batch-cancel`, definiitionIds);
-    },
-
-    get: (executionId: string) => {
-        return HttpUtils.get(apiPrefixExecution + `/${executionId}`);
-    },
-
-    taskLog: (id: string) => {
-        return HttpUtils.get<any>(apiPrefixExecution + `/taskLog/${id}`);
-    },
-
-
-    getExecutionInfo: (id: String): Promise<{ code: number; data: any; message?: string }> => {
-        return HttpUtils.get(`${apiPrefixExecution}/execution-info/` + id);
-    },
+  batchPause: (jobDefinitionIds: React.Key[]): any => {
+    return HttpUtils.post(`${apiPrefixExecutor}/batch-pause`, {
+      jobDefinitionIds: jobDefinitionIds.map(Number),
+    });
+  },
 };

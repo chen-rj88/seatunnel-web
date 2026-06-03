@@ -10,6 +10,8 @@ import org.apache.seatunnel.web.spi.bean.dto.command.JobDefinitionSaveCommand;
 import org.apache.seatunnel.web.spi.bean.entity.PaginationResult;
 import org.apache.seatunnel.web.spi.bean.vo.BatchJobDefinitionVO;
 
+import java.util.List;
+
 public interface BatchJobDefinitionService {
 
     Long saveOrUpdate(BatchScriptJobSaveCommand command);
@@ -33,4 +35,6 @@ public interface BatchJobDefinitionService {
     JobDefinitionSaveCommand selectEditDetail(Long id);
 
     Boolean updateReleaseState(Long id, ReleaseState releaseState);
+
+    List<BatchJobDefinitionVO> listByIds(List<Long> jobDefinitionIds);
 }

@@ -504,6 +504,40 @@ CREATE TABLE `t_seatunnel_streaming_job_table_metrics_current`
     KEY                    `idx_streaming_table_current_sink` (`sink_table`),
     KEY                    `idx_streaming_table_current_update_time` (`update_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COMMENT='SeaTunnel streaming latest table metrics';
+
+
+CREATE TABLE `t_seatunnel_streaming_job_instance`
+(
+    `id`                bigint      NOT NULL COMMENT '主键ID',
+    `job_definition_id` bigint      NOT NULL COMMENT '实时任务定义ID',
+    `client_id`         bigint               DEFAULT NULL COMMENT 'SeaTunnel Client ID',
+    `run_mode`          varchar(32) NOT NULL COMMENT '运行模式：MANUAL / SCHEDULE / RETRY',
+    `job_status`        varchar(32) NOT NULL COMMENT '实例状态',
+    `trigger_source`    varchar(64)          DEFAULT NULL COMMENT '触发来源',
+    `retry_count`       int         NOT NULL DEFAULT '0' COMMENT '重试次数',
+    `engine_job_id`     bigint               DEFAULT NULL COMMENT 'SeaTunnel Engine Job ID',
+    `runtime_config`    longtext COMMENT '本次执行使用的 HOCON 配置',
+    `log_path`          varchar(512)         DEFAULT NULL COMMENT '日志路径',
+    `error_message`     text COMMENT '错误摘要',
+    `submit_time`       datetime             DEFAULT NULL COMMENT '提交时间',
+    `start_time`        datetime             DEFAULT NULL COMMENT '开始时间',
+    `end_time`          datetime             DEFAULT NULL COMMENT '结束时间',
+
+    `checkpoint_path`   varchar(1024)        DEFAULT NULL COMMENT 'Checkpoint 路径',
+    `savepoint_path`    varchar(1024)        DEFAULT NULL COMMENT 'Savepoint 路径',
+    `last_collect_time` datetime             DEFAULT NULL COMMENT '最后一次指标采集时间',
+
+    `create_time`       datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`       datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+
+    PRIMARY KEY (`id`),
+    KEY                 `idx_streaming_instance_definition_id` (`job_definition_id`),
+    KEY                 `idx_streaming_instance_status` (`job_status`),
+    KEY                 `idx_streaming_instance_engine_job_id` (`engine_job_id`),
+    KEY                 `idx_streaming_instance_create_time` (`create_time`),
+    KEY                 `idx_streaming_instance_definition_status` (`job_definition_id`, `job_status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='实时任务运行实例表';
+
 -- ----------------------------
 -- Table structure for qrtz_blob_triggers
 -- ----------------------------

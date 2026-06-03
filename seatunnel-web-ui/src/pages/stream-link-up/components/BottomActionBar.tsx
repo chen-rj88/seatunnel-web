@@ -27,7 +27,7 @@ const BottomActionBar: React.FC<BottomActionBarProps> = ({
   return (
     <div className="fixed bottom-0 right-0 z-[99] flex min-h-16 items-center justify-between border-t border-slate-200 bg-white/90 px-10 py-3 backdrop-blur-xl left-[var(--pro-sider-current-width,0px)]">
       <div className="flex items-center gap-3">
-        <Button
+        {/* <Button
           type="primary"
           icon={<PlayCircleOutlined />}
           disabled={disabled}
@@ -50,7 +50,7 @@ const BottomActionBar: React.FC<BottomActionBarProps> = ({
           <Tag color="blue" className="rounded-full px-3 py-0.5">
             已选择 {selectedCount} 个任务
           </Tag>
-        )}
+        )} */}
       </div>
 
       <div className="flex items-center gap-4 text-slate-500">
