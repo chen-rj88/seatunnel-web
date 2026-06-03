@@ -143,7 +143,7 @@
         ) m
         ON i.id = m.job_instance_id
 
-        LEFT JOIN t_seatunnel_job_schedule s
+        LEFT JOIN t_seatunnel_web_job_schedule s
         ON i.job_definition_id = s.job_definition_id
 
         WHERE i.id = #{id}
@@ -160,7 +160,7 @@
 
         FROM t_seatunnel_web_job_instance i
 
-        LEFT JOIN t_seatunnel_job_definition d
+        LEFT JOIN t_seatunnel_web_job_definition d
         ON i.job_definition_id = d.id
 
         LEFT JOIN (
