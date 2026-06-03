@@ -9,7 +9,7 @@ import org.apache.seatunnel.web.common.enums.UserType;
 import java.util.Date;
 
 @Data
-@TableName("t_seatunnel_user")
+@TableName("t_seatunnel_web_user")
 public class User {
 
     @TableId(value = "id", type = IdType.AUTO)

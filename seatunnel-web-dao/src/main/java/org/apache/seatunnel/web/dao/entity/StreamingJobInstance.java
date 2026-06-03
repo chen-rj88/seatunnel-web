@@ -14,7 +14,7 @@ import java.util.Date;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@TableName("t_seatunnel_streaming_job_instance")
+@TableName("t_seatunnel_web_streaming_job_instance")
 public class StreamingJobInstance {
 
     private Long id;

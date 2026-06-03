@@ -96,16 +96,16 @@
         ji.start_time AS last_start_time,
         ji.end_time AS last_end_time,
         ji.error_message AS last_error_message
-        FROM t_seatunnel_streaming_job_definition d
+        FROM t_seatunnel_web_streaming_job_definition d
         LEFT JOIN (
         SELECT
         i.*
-        FROM t_seatunnel_streaming_job_instance i
+        FROM t_seatunnel_web_streaming_job_instance i
         INNER JOIN (
         SELECT
         job_definition_id,
         MAX(id) AS latest_instance_id
-        FROM t_seatunnel_streaming_job_instance
+        FROM t_seatunnel_web_streaming_job_instance
         GROUP BY job_definition_id
         ) latest
         ON latest.latest_instance_id = i.id
@@ -118,7 +118,7 @@
 
     <select id="countPage" resultType="java.lang.Long">
         SELECT COUNT(1)
-        FROM t_seatunnel_streaming_job_definition d
+        FROM t_seatunnel_web_streaming_job_definition d
         <include refid="StreamingDefinitionWhere"/>
     </select>
 

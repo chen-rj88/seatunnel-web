@@ -14,7 +14,7 @@ import java.util.Date;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
-@TableName("t_seatunnel_job_definition")
+@TableName("t_seatunnel_web_job_definition")
 public class BatchJobDefinition {
 
     @TableId(type = IdType.INPUT)

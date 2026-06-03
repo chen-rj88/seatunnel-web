@@ -11,7 +11,7 @@ import org.apache.seatunnel.web.common.enums.ReleaseState;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
-@TableName("t_seatunnel_job_definition")
+@TableName("t_seatunnel_web_job_definition")
 public class JobDefinitionEntity extends BaseEntity {
 
     private String jobName;

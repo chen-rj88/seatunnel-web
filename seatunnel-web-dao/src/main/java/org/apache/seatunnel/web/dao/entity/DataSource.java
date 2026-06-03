@@ -10,7 +10,7 @@ import org.apache.seatunnel.web.spi.enums.DbType;
 
 
 @Data
-@TableName("t_seatunnel_datasource")
+@TableName("t_seatunnel_web_datasource")
 @EqualsAndHashCode(callSuper = true)
 public class DataSource extends BaseEntity {
 

@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
-@TableName("t_seatunnel_streaming_job_table_metrics_current")
+@TableName("t_seatunnel_web_streaming_job_table_metrics_current")
 public class StreamingJobTableMetricsCurrent {
 
     private Long jobInstanceId;
