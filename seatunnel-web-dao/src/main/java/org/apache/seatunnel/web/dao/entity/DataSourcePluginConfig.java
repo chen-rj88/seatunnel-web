@@ -7,7 +7,7 @@ import lombok.EqualsAndHashCode;
 import org.apache.seatunnel.web.spi.enums.DbType;
 
 @Data
-@TableName("t_seatunnel_datasource_plugin_config")
+@TableName("t_seatunnel_web_datasource_plugin_config")
 @EqualsAndHashCode(callSuper = true)
 public class DataSourcePluginConfig extends BaseEntity {
 

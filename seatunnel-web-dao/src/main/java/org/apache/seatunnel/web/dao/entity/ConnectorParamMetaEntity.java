@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("t_connector_param_meta")
+@TableName("t_seatunnel_web_connector_param_meta")
 public class ConnectorParamMetaEntity extends BaseEntity implements Serializable {
 
     @Serial

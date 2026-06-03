@@ -9,7 +9,7 @@ import java.util.Date;
 /**
  * session
  */
-@TableName("t_seatunnel_session")
+@TableName("t_seatunnel_web_session")
 public class Session {
 
     /**
