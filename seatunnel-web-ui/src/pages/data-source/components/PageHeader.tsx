@@ -57,10 +57,10 @@ const PageHeader: React.FC<PageHeaderProps> = ({ onCreate }) => {
         className={[
           '!h-[42px] !shrink-0 !rounded-full !px-5 !font-semibold',
           '!border-[hsl(231_48%_48%)] !bg-[hsl(231_48%_48%)]',
-          'shadow-[0_8px_18px_hsl(231_48%_48%/0.22)]',
+          // 'shadow-[0_8px_18px_hsl(231_48%_48%/0.22)]',
           'transition-all duration-200 ease-out',
           ' hover:!border-[hsl(231_48%_44%)] hover:!bg-[hsl(231_48%_44%)]',
-          'hover:!shadow-[0_12px_24px_hsl(231_48%_48%/0.26)]',
+          // 'hover:!shadow-[0_12px_24px_hsl(231_48%_48%/0.26)]',
         ].join(' ')}
       >
         新建数据源
