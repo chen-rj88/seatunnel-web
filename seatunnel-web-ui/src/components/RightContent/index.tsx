@@ -1,18 +1,17 @@
-import { ApiOutlined, BarChartOutlined, QuestionCircleOutlined, ReadOutlined } from "@ant-design/icons";
+import { ApiOutlined, BarChartOutlined, ReadOutlined } from "@ant-design/icons";
 import { SelectLang as UmiSelectLang } from "@umijs/max";
-import { history } from "umi";
-import "./index.less";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import moment from "moment";
 import {
   Boxes,
   BriefcaseBusiness,
+  ChevronsLeftRight,
+  Database,
   MonitorX,
   Palette,
-  Database,
-  ChevronsLeftRight,
 } from "lucide-react";
-
+import moment from "moment";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { history } from "umi";
+import "./index.less";
 
 export type SiderTheme = "light" | "dark";
 
@@ -40,7 +39,7 @@ export const BI: React.FC = () => {
         history.push("/bi");
       }}
     >
-      <BarChartOutlined  />
+      <BarChartOutlined />
     </div>
   );
 };
@@ -111,7 +110,8 @@ const buildQueryString = (query?: Record<string, string>) => {
   return queryString ? `?${queryString}` : "";
 };
 
-const formatDateTime = (value: moment.Moment) => value.format("YYYY-MM-DD HH:mm:ss");
+const formatDateTime = (value: moment.Moment) =>
+  value.format("YYYY-MM-DD HH:mm:ss");
 
 const getTodayRange = () => ({
   createTimeStart: formatDateTime(moment().startOf("day")),
@@ -245,7 +245,7 @@ export const GlobalSearch: React.FC = () => {
       (item) =>
         item.title.toLowerCase().includes(keyword.toLowerCase()) ||
         item.desc.toLowerCase().includes(keyword.toLowerCase()) ||
-        item.tag.toLowerCase().includes(keyword.toLowerCase()),
+        item.tag.toLowerCase().includes(keyword.toLowerCase())
     );
   }, [keyword]);
 
@@ -282,7 +282,9 @@ export const GlobalSearch: React.FC = () => {
 
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActiveIndex((prev) => (prev - 1 + filteredList.length) % filteredList.length);
+      setActiveIndex(
+        (prev) => (prev - 1 + filteredList.length) % filteredList.length
+      );
     }
 
     if (e.key === "Enter") {
@@ -296,135 +298,118 @@ export const GlobalSearch: React.FC = () => {
   };
 
   return (
-    <div style={{ marginRight: "27vw" }}>
-      <div className="flex flex-1 justify-center max-w-xl">
+    <div className="fixed top-1 left-1/2 z-50 w-[clamp(280px,32vw,460px)] -translate-x-1/2" >
+      <div ref={wrapperRef} className="relative w-full">
         <div
-          ref={wrapperRef}
-          className="relative max-w-md"
-          style={{ width: "48vh" }}
+          className={`rounded-full border transition-all duration-300 bg-white ${
+            open
+              ? "border-blue-600 shadow-[0_0_0_3px_rgba(59,130,246,0.1)]"
+              : "border-gray-300 shadow-sm"
+          }`}
         >
-          <div
-            className="rounded-full border transition-all duration-300"
-            style={{
-              background: "#fff",
-              borderColor: open ? "hsl(231 48% 48%)" : "#d1d5db",
-              boxShadow: open
-                ? "0 0 0 3px rgba(59,130,246,0.10)"
-                : "0 1px 2px rgba(15,23,42,0.04)",
-            }}
-          >
-            <div className="relative rounded-full">
-              <input
-                className="flex w-full bg-background px-4 py-1.5 pl-9 pr-9 text-sm h-9 rounded-full focus-visible:outline-none"
-                placeholder="Search batch jobs、stream jobs..."
-                type="text"
-                value={keyword}
-                onFocus={() => setOpen(true)}
-                onKeyDown={handleKeyDown}
-                onChange={(e) => {
-                  setKeyword(e.target.value);
-                  if (!open) setOpen(true);
-                }}
-                style={{
-                  border: "none",
-                  boxShadow: "none",
-                  background: "transparent",
-                }}
-              />
+          <div className="relative rounded-full">
+            <input
+              type="text"
+              value={keyword}
+              onFocus={() => setOpen(true)}
+              onKeyDown={handleKeyDown}
+              onChange={(e) => {
+                setKeyword(e.target.value);
+                if (!open) setOpen(true);
+              }}
+              placeholder="Search batch jobs、stream jobs..."
+              className="flex w-full bg-transparent px-4  pl-9 pr-9 text-sm h-9 rounded-full focus:outline-none"
+            />
 
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width={24}
+              height={24}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+
+            {keyword && (
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 hover:bg-slate-100"
+                onClick={() => setKeyword("")}
               >
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.3-4.3" />
-              </svg>
-
-              {keyword && (
-                <button
-                  type="button"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 hover:bg-slate-100"
-                  onClick={() => setKeyword("")}
-                >
-                  <div className="flex h-4 w-4 items-center justify-center text-slate-400">
-                    ×
-                  </div>
-                </button>
-              )}
-            </div>
+                <div className="flex h-4 w-4 items-center justify-center text-slate-400">
+                  ×
+                </div>
+              </button>
+            )}
           </div>
+        </div>
 
-          <div
-            className="absolute top-full left-0 right-0 z-50 mt-1 overflow-hidden rounded-3xl border shadow-lg dark:border-neutral-700 transition-all duration-300 ease-out"
-            style={{
-              backgroundColor: "white",
-              opacity: open ? 1 : 0,
-              maxHeight: open ? 420 : 0,
-              transform: open
-                ? "translateY(0px) scale(1)"
-                : "translateY(-6px) scale(0.98)",
-              transformOrigin: "top center",
-              pointerEvents: open ? "auto" : "none",
-            }}
-          >
-            <ul className="py-1">
-              {filteredList.length > 0 ? (
-                filteredList.map((item, index) => {
-                  const isActive = index === activeIndex;
-
-                  return (
-                    <li
-                      key={item.id}
-                      className="cursor-pointer px-3 py-2 flex items-center justify-between transition-all duration-200 custom-hover"
-                      style={{
-                        opacity: open ? 1 : 0,
-                        transform: open ? "translateY(0)" : "translateY(-6px)",
-                        transitionDelay: `${index * 35}ms`,
-                        background: isActive ? "#F8FAFC" : "transparent",
-                      }}
-                      onMouseEnter={() => setActiveIndex(index)}
-                      onClick={() => handleSelect(item)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-muted-foreground">{item.icon}</span>
-                        <div className="flex flex-col">
-                          <span
-                            className="text-sm font-medium"
-                            style={{ color: "black", fontFamily: "Inter, sans-serif" }}
-                          >
-                            {item.title}
-                          </span>
-                          <span className="text-xs text-muted-foreground">{item.desc}</span>
-                        </div>
+        {/* 下拉列表 */}
+        <div
+          className="absolute top-full left-0 right-0 z-50 mt-1 overflow-hidden rounded-3xl border shadow-lg transition-all duration-300 ease-out bg-white"
+          style={{
+            opacity: open ? 1 : 0,
+            maxHeight: open ? 420 : 0,
+            transform: open
+              ? "translateY(0px) scale(1)"
+              : "translateY(-6px) scale(0.98)",
+            transformOrigin: "top center",
+            pointerEvents: open ? "auto" : "none",
+          }}
+        >
+          <ul className="py-1">
+            {filteredList.length > 0 ? (
+              filteredList.map((item, index) => {
+                const isActive = index === activeIndex;
+                return (
+                  <li
+                    key={item.id}
+                    className="cursor-pointer px-3 py-2 flex items-center justify-between transition-all duration-200 custom-hover"
+                    style={{
+                      opacity: open ? 1 : 0,
+                      transform: open ? "translateY(0)" : "translateY(-6px)",
+                      transitionDelay: `${index * 35}ms`,
+                      background: isActive ? "#F8FAFC" : "transparent",
+                    }}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => handleSelect(item)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-muted-foreground">{item.icon}</span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-black font-inter">
+                          {item.title}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {item.desc}
+                        </span>
                       </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                      {item.tag}
+                    </span>
+                  </li>
+                );
+              })
+            ) : (
+              <li className="px-3 py-8 text-center text-sm text-muted-foreground">
+                No results found
+              </li>
+            )}
+          </ul>
 
-                      <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
-                        {item.tag}
-                      </span>
-                    </li>
-                  );
-                })
-              ) : (
-                <li className="px-3 py-8 text-center text-sm text-muted-foreground">
-                  No results found
-                </li>
-              )}
-            </ul>
-
-            <div className="px-3 py-2 border-t border-border">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>↑↓ Navigate</span>
-                <span>↵ Select</span>
-                <span>ESC Close</span>
-              </div>
+          <div className="px-3 py-2 border-t border-border">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>↑↓ Navigate</span>
+              <span>↵ Select</span>
+              <span>ESC Close</span>
             </div>
           </div>
         </div>
