@@ -42,14 +42,10 @@ SeaTunnel Web makes working with Apache SeaTunnel simpler and faster for develop
 
 ## 🔥 Join Group
 
-If you would like to be among the first to experience the adapted version of SeaTunnel Web,
-or join us in building the ecosystem from 0 to 1, you are warmly welcome to join the SeaTunnel Web Early Co-Creation Group.
+If you’d like to be among the first to try the adapted version of SeaTunnel Web,
+or help us build the ecosystem from **0 to 1**, you are warmly welcome to join the **SeaTunnel Web Early Co-Creation Group**.
+
+Being a contributor here isn’t just about writing code or documentation—anyone who **shares ideas**, **gives feedback**, or **talks about SeaTunnel** can be a valued part of the project. Your **voice matters** in shaping the future of SeaTunnel Web!
 
 <img width="200" height="320" alt="18c35fe621b51b15ba4e72c872ab2816" src="https://github.com/user-attachments/assets/08fc53cb-7cb3-4cc6-bf81-5e86d6a991b4" />
 
-## Github Address
-- https://github.com/weifuwan/seatunnel-web
-
-## How to Contribute
-
-We welcome contributions in any form.
