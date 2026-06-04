@@ -5,51 +5,47 @@
 
 <p align="center">
 <a href="http://111.230.213.87:8000" target="_blank">Live Demo</a>｜
-<a href="https://doc.seatunnel-web.com/">中文文档</a>｜
-<a href="http://111.230.213.87:9001/">官网</a>
+<a href="https://doc.seatunnel-web.com/">Doc</a>｜
+<a href="http://111.230.213.87:9001/">Home</a>
 </p>
-
 
 ## SeaTunnel Web
 
-**SeaTunnel Web** is a modern web-based management platform for **Apache SeaTunnel**, designed to simplify the creation, configuration, and operation of data integration pipelines.
+**SeaTunnel Web** is a third-party web platform for **Apache SeaTunnel**, built to make it easier to create, configure, and run data pipelines.
 
-It provides a visual interface to build data pipelines using **DAG orchestration**, manage connectors, configure jobs, and monitor task execution. SeaTunnel Web helps data engineers efficiently manage both **batch and streaming data integration workflows** without manually writing complex configuration files.
+It provides a visual interface to design pipelines with **DAGs**, manage connectors, configure jobs, and watch tasks in real time. SeaTunnel Web helps data engineers handle both **batch and streaming workflows** without writing complex configuration files by hand.
 
-The platform focuses on improving the usability and productivity of Apache SeaTunnel by offering a centralized environment for pipeline development and job management.
+The platform focuses on making Apache SeaTunnel easier to use, maintain, and operate in production.
 
 ### Key Features
 
-- **Visual Pipeline Builder**  
-  Design data pipelines using a DAG-based interface.
+* **Visual Pipeline Builder**
+  Build pipelines using a simple drag-and-drop DAG interface.
 
-- **Connector Configuration**  
-  Easily configure SeaTunnel source, transform, and sink connectors.
+* **Connector Management**
+  Set up sources, transforms, and sinks easily.
 
-- **Job Management**  
-  Create, edit, run, and manage SeaTunnel jobs from a unified web interface.
+* **Job Control**
+  Create, edit, run, and manage jobs from one place.
 
-- **Batch & Streaming Support**  
-  Manage both batch and streaming data integration tasks.
+* **Batch & Streaming Support**
+  Handle both batch and streaming data tasks.
 
-- **Execution Monitoring**  
-  Monitor job execution status and task history in real time.
+* **Real-Time Monitoring**
+  Watch job status and task history as they run.
 
-- **Configuration Simplification**  
-  Generate SeaTunnel job configurations automatically from visual pipelines.
+* **Auto Configuration**
+  Generate job configurations automatically from your visual pipeline.
 
-SeaTunnel Web aims to make Apache SeaTunnel more accessible, maintainable, and easier to operate in production environments.
+SeaTunnel Web makes working with Apache SeaTunnel simpler and faster for developers and teams, while being fully independent as a third-party tool.
+
 
 ## 🔥 Join Group
 
-If you would like to be among the first to experience the adapted version of SeaTunnel Web,
-or join us in building the ecosystem from 0 to 1, you are warmly welcome to join the SeaTunnel Web Early Co-Creation Group.
+If you’d like to be among the first to try the adapted version of SeaTunnel Web,
+or help us build the ecosystem from **0 to 1**, you are warmly welcome to join the **SeaTunnel Web Early Co-Creation Group**.
+
+Being a contributor here isn’t just about writing code or documentation—anyone who **shares ideas**, **gives feedback**, or **talks about SeaTunnel** can be a valued part of the project. Your **voice matters** in shaping the future of SeaTunnel Web!
 
 <img width="200" height="320" alt="18c35fe621b51b15ba4e72c872ab2816" src="https://github.com/user-attachments/assets/08fc53cb-7cb3-4cc6-bf81-5e86d6a991b4" />
 
-## Github Address
-- https://github.com/weifuwan/seatunnel-web
-
-## How to Contribute
-
-We welcome contributions in any form.
