@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/dot-notation */
-import { extend } from "umi-request";
 import { openPrettyNotification } from "@/utils/prettyNotification";
 import { history } from "umi";
-
+import { extend } from "umi-request";
 
 const codeMessage: Record<number, string> = {
   10000: "系统未知错误，请反馈给管理员",
@@ -161,7 +160,11 @@ request.interceptors.response.use(async (response: Response, options: any) => {
   }
 
   const clonedResponse = response.clone();
-  const res: ApiResponse<any> = await clonedResponse.json();
+  const res: any = await clonedResponse.json();
+  if (res?.message === "NOT_LOGIN" || res?.code === 1) {
+    goLogin();
+    return response || {};
+  }
 
   if (typeof res?.code !== "undefined" && res.code !== 0) {
     throw new BizError(
