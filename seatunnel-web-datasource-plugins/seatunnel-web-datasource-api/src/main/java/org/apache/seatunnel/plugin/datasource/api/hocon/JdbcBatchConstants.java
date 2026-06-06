@@ -23,6 +23,7 @@ public final class JdbcBatchConstants {
     public static final String DRIVER = "driver";
     public static final String DATABASE = "database";
     public static final String SCHEMA = "schema";
+    public static final String SCHEMA_NAME = "schemaName";
 
     // =========================
     // SeaTunnel official common keys
