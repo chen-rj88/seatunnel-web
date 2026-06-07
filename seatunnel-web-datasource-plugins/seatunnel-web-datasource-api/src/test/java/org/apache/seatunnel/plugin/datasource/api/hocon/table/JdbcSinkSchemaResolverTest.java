@@ -11,6 +11,7 @@ import static org.apache.seatunnel.plugin.datasource.api.hocon.JdbcBatchConstant
 import static org.apache.seatunnel.plugin.datasource.api.hocon.JdbcBatchConstants.GENERATE_SINK_SQL;
 import static org.apache.seatunnel.plugin.datasource.api.hocon.JdbcBatchConstants.TABLE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class JdbcSinkSchemaResolverTest {
 
@@ -83,6 +84,33 @@ class JdbcSinkSchemaResolverTest {
     }
 
     @Test
+    void singleMysqlSinkUsesDatabaseAndBareTable() {
+        Map<String, Object> map = new HashMap<>();
+
+        singleBuilder.build(
+                config("targetTableName = user_info"),
+                mysqlConnection("database = test_db"),
+                map);
+
+        assertEquals("test_db", map.get(DATABASE));
+        assertEquals("user_info", map.get(TABLE));
+        assertEquals(true, map.get(GENERATE_SINK_SQL));
+    }
+
+    @Test
+    void multiMysqlSinkUsesDatabaseAndTableNamePlaceholder() {
+        Map<String, Object> map = new HashMap<>();
+
+        multiBuilder.build(
+                config("multiTable = true"),
+                mysqlConnection("database = test_db"),
+                map);
+
+        assertEquals("test_db", map.get(DATABASE));
+        assertEquals("${table_name}", map.get(TABLE));
+    }
+
+    @Test
     void sinkKeepsOriginalTableWithoutSchemaName() {
         Map<String, Object> singleMap = new HashMap<>();
         singleBuilder.build(
@@ -98,6 +126,78 @@ class JdbcSinkSchemaResolverTest {
 
         assertEquals("user_info", singleMap.get(TABLE));
         assertEquals("${table_name}", multiMap.get(TABLE));
+    }
+
+    @Test
+    void oracleSingleSinkPrefixesSchemaWhenBareTable() {
+        Map<String, Object> map = new HashMap<>();
+
+        singleBuilder.build(
+                config("targetTableName = USER_INFO"),
+                oracleConnection("database = XE\nschemaName = APP"),
+                map);
+
+        assertEquals("XE", map.get(DATABASE));
+        assertEquals("APP.USER_INFO", map.get(TABLE));
+    }
+
+    @Test
+    void oracleSingleSinkKeepsSchemaQualifiedTable() {
+        Map<String, Object> map = new HashMap<>();
+
+        singleBuilder.build(
+                config("targetTableName = \"APP.USER_INFO\""),
+                oracleConnection("database = XE\nschemaName = APP"),
+                map);
+
+        assertEquals("XE", map.get(DATABASE));
+        assertEquals("APP.USER_INFO", map.get(TABLE));
+    }
+
+    @Test
+    void oracleMultiSinkUsesSchemaTablePattern() {
+        Map<String, Object> map = new HashMap<>();
+
+        multiBuilder.build(
+                config("multiTable = true"),
+                oracleConnection("database = XE\nschemaName = APP"),
+                map);
+
+        assertEquals("XE", map.get(DATABASE));
+        assertEquals("APP.${table_name}", map.get(TABLE));
+    }
+
+    @Test
+    void oracleMultiSinkKeepsExplicitTablePattern() {
+        Map<String, Object> map = new HashMap<>();
+
+        multiBuilder.build(
+                config("multiTable = true\ntablePattern = \"CUSTOM_${table_name}\""),
+                oracleConnection("database = XE\nschemaName = APP"),
+                map);
+
+        assertEquals("XE", map.get(DATABASE));
+        assertEquals("CUSTOM_${table_name}", map.get(TABLE));
+    }
+
+    @Test
+    void nonPostgreSqlSinkShouldNotUsePostgreSqlDefaultPublic() {
+        Map<String, Object> oracleMap = new HashMap<>();
+        singleBuilder.build(
+                config("targetTableName = USER_INFO"),
+                oracleConnection("database = XE"),
+                oracleMap);
+
+        Map<String, Object> mysqlMap = new HashMap<>();
+        singleBuilder.build(
+                config("targetTableName = user_info"),
+                mysqlConnection("database = test_db"),
+                mysqlMap);
+
+        assertEquals("USER_INFO", oracleMap.get(TABLE));
+        assertEquals("user_info", mysqlMap.get(TABLE));
+        assertFalse(String.valueOf(oracleMap.get(TABLE)).contains("public."));
+        assertFalse(String.valueOf(mysqlMap.get(TABLE)).contains("public."));
     }
 
     @Test
@@ -126,6 +226,14 @@ class JdbcSinkSchemaResolverTest {
     private Config mysqlConnection(String body) {
         return ConfigFactory.parseString(
                 "url = \"jdbc:mysql://localhost:3306/test_db\"\n"
+                        + "user = test\n"
+                        + body);
+    }
+
+    private Config oracleConnection(String body) {
+        return ConfigFactory.parseString(
+                "url = \"jdbc:oracle:thin:@localhost:1521:XE\"\n"
+                        + "driver = \"oracle.jdbc.OracleDriver\"\n"
                         + "user = test\n"
                         + body);
     }

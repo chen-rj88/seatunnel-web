@@ -54,6 +54,20 @@ class JdbcSourceTargetBuilderTest {
     }
 
     @Test
+    void singleMysqlTableNameUsesConnectionDatabase() {
+        Map<String, Object> map = new HashMap<>();
+
+        singleBuilder.build(
+                config("table = \"user_info\""),
+                mysqlConnection("database = test_db"),
+                map,
+                HoconBuildStage.DEFINITION);
+
+        assertEquals("test_db", map.get(DATABASE));
+        assertEquals("test_db.user_info", map.get(TABLE_PATH));
+    }
+
+    @Test
     void singleMysqlDatabaseQualifiedTablePathIsKept() {
         Map<String, Object> map = new HashMap<>();
 
@@ -65,6 +79,23 @@ class JdbcSourceTargetBuilderTest {
 
         assertEquals("st_test", map.get(DATABASE));
         assertEquals("st_src.issue108_user", map.get(TABLE_PATH));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void multiMysqlTableListUsesConnectionDatabase() {
+        Map<String, Object> map = new HashMap<>();
+
+        multiBuilder.build(
+                config("table_list = [\"user_info\", \"role\"]"),
+                mysqlConnection("database = test_db"),
+                map,
+                HoconBuildStage.DEFINITION);
+
+        List<Map<String, Object>> tableList = (List<Map<String, Object>>) map.get(TABLE_LIST);
+        assertEquals("test_db", map.get(DATABASE));
+        assertEquals("test_db.user_info", tableList.get(0).get(TABLE_PATH));
+        assertEquals("test_db.role", tableList.get(1).get(TABLE_PATH));
     }
 
     @Test
@@ -82,6 +113,73 @@ class JdbcSourceTargetBuilderTest {
         assertEquals("st_test", map.get(DATABASE));
         assertEquals("st_test.st_src.issue108_user", tableList.get(0).get(TABLE_PATH));
         assertEquals("st_test.st_src.issue108_role", tableList.get(1).get(TABLE_PATH));
+    }
+
+    @Test
+    void oracleSingleSourceUsesSchemaTableNotDatabaseSchemaTable() {
+        Map<String, Object> map = new HashMap<>();
+
+        singleBuilder.build(
+                config("table = \"USER_INFO\""),
+                oracleConnection("database = XE\nschemaName = APP"),
+                map,
+                HoconBuildStage.DEFINITION);
+
+        assertEquals("XE", map.get(DATABASE));
+        assertEquals("APP.USER_INFO", map.get(TABLE_PATH));
+    }
+
+    @Test
+    void oracleSingleSourceKeepsSchemaQualifiedTable() {
+        Map<String, Object> map = new HashMap<>();
+
+        singleBuilder.build(
+                config("table = \"APP.USER_INFO\""),
+                oracleConnection("database = XE\nschemaName = APP"),
+                map,
+                HoconBuildStage.DEFINITION);
+
+        assertEquals("XE", map.get(DATABASE));
+        assertEquals("APP.USER_INFO", map.get(TABLE_PATH));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void oracleMultiSourceUsesSchemaTableList() {
+        Map<String, Object> map = new HashMap<>();
+
+        multiBuilder.build(
+                config("table_list = [\"USER_INFO\", \"ROLE\"]"),
+                oracleConnection("database = XE\nschemaName = APP"),
+                map,
+                HoconBuildStage.DEFINITION);
+
+        List<Map<String, Object>> tableList = (List<Map<String, Object>>) map.get(TABLE_LIST);
+        assertEquals("XE", map.get(DATABASE));
+        assertEquals("APP.USER_INFO", tableList.get(0).get(TABLE_PATH));
+        assertEquals("APP.ROLE", tableList.get(1).get(TABLE_PATH));
+    }
+
+    @Test
+    void nonPostgreSqlSourceShouldNotUsePostgreSqlDefaultPublic() {
+        Map<String, Object> oracleMap = new HashMap<>();
+        singleBuilder.build(
+                config("table = \"USER_INFO\""),
+                oracleConnection("database = XE"),
+                oracleMap,
+                HoconBuildStage.DEFINITION);
+
+        Map<String, Object> mysqlMap = new HashMap<>();
+        singleBuilder.build(
+                config("table = \"user_info\""),
+                mysqlConnection("database = test_db"),
+                mysqlMap,
+                HoconBuildStage.DEFINITION);
+
+        assertEquals("USER_INFO", oracleMap.get(TABLE_PATH));
+        assertEquals("test_db.user_info", mysqlMap.get(TABLE_PATH));
+        assertFalse(String.valueOf(oracleMap.get(TABLE_PATH)).contains("public."));
+        assertFalse(String.valueOf(mysqlMap.get(TABLE_PATH)).contains("public."));
     }
 
     @Test
@@ -115,6 +213,15 @@ class JdbcSourceTargetBuilderTest {
         return ConfigFactory.parseString(
                 "url = \"jdbc:mysql://mysql:3306/st_test\"\n"
                         + "driver = \"com.mysql.cj.jdbc.Driver\"\n"
+                        + "user = st\n"
+                        + "password = st_pass\n"
+                        + body);
+    }
+
+    private Config oracleConnection(String body) {
+        return ConfigFactory.parseString(
+                "url = \"jdbc:oracle:thin:@localhost:1521:XE\"\n"
+                        + "driver = \"oracle.jdbc.OracleDriver\"\n"
                         + "user = st\n"
                         + "password = st_pass\n"
                         + body);

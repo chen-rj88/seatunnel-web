@@ -138,6 +138,10 @@ public class JdbcTableNameResolver {
             return normalizePostgreSqlSourceTablePath(database, schema, trimmed);
         }
 
+        if (isOracle(config, conn)) {
+            return normalizeOracleSourceTablePath(schema, trimmed);
+        }
+
         if (isFullTablePath(trimmed)) {
             return trimmed;
         }
@@ -163,6 +167,23 @@ public class JdbcTableNameResolver {
         }
 
         return table.trim();
+    }
+
+    private String normalizeOracleSourceTablePath(String schema, String table) {
+        if (StringUtils.isBlank(table)) {
+            return "";
+        }
+
+        String trimmed = table.trim();
+        if (isFullTablePath(trimmed)) {
+            return trimmed;
+        }
+
+        if (StringUtils.isNotBlank(schema)) {
+            return schema.trim() + "." + trimmed;
+        }
+
+        return trimmed;
     }
 
     private String normalizePostgreSqlSourceTablePath(String database, String schema, String table) {
@@ -223,6 +244,17 @@ public class JdbcTableNameResolver {
                 || containsIgnoreCase(conn, DRIVER, "postgresql")
                 || startsWithIgnoreCase(config, URL, "jdbc:postgresql:")
                 || startsWithIgnoreCase(conn, URL, "jdbc:postgresql:");
+    }
+
+    private boolean isOracle(Config config, Config conn) {
+        return containsIgnoreCase(config, PLUGIN_NAME, "oracle")
+                || containsIgnoreCase(conn, PLUGIN_NAME, "oracle")
+                || containsIgnoreCase(config, DB_TYPE, "oracle")
+                || containsIgnoreCase(conn, DB_TYPE, "oracle")
+                || containsIgnoreCase(config, DRIVER, "oracle")
+                || containsIgnoreCase(conn, DRIVER, "oracle")
+                || startsWithIgnoreCase(config, URL, "jdbc:oracle:")
+                || startsWithIgnoreCase(conn, URL, "jdbc:oracle:");
     }
 
     private boolean containsIgnoreCase(Config config, String path, String searchText) {
