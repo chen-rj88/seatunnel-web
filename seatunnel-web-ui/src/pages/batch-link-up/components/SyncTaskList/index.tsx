@@ -1,8 +1,8 @@
 import { history, useIntl } from "@umijs/max";
-import { Divider, Table, message } from "antd";
+import { Divider, Empty, Table, message } from "antd";
 import { TableRowSelection } from "antd/es/table/interface";
 import moment from "moment";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { seatunnelJobDefinitionApi } from "../../api";
 import { batchJobExecutorApi } from "../../type";
 import ActionColumn from "./components/ActionColumn";
@@ -154,45 +154,6 @@ const App: React.FC<Props> = ({ goDetail }) => {
     fetchTaskList();
   }, [searchParams, pagination.current, pagination.pageSize]);
 
-  const menuItems = useMemo(
-    () => [
-      {
-        key: "view",
-        label: (
-          <span style={{ fontWeight: 500 }}>
-            {intl.formatMessage({
-              id: "pages.job.menu.view",
-              defaultMessage: "View",
-            })}
-          </span>
-        ),
-      },
-      {
-        key: "edit",
-        label: (
-          <span style={{ fontWeight: 500 }}>
-            {intl.formatMessage({
-              id: "pages.job.menu.edit",
-              defaultMessage: "Edit",
-            })}
-          </span>
-        ),
-      },
-      {
-        key: "delete",
-        label: (
-          <span style={{ fontWeight: 500 }}>
-            {intl.formatMessage({
-              id: "pages.job.menu.delete",
-              defaultMessage: "Delete",
-            })}
-          </span>
-        ),
-      },
-    ],
-    [intl]
-  );
-
   const baseColumns = [
     {
       title: intl.formatMessage({
@@ -211,9 +172,7 @@ const App: React.FC<Props> = ({ goDetail }) => {
             })}
           </em>
           :{" "}
-          <span style={{ fontSize: "12px", color: "gray" }}>
-            {record?.id}
-          </span>{" "}
+          <span style={{ fontSize: "12px", color: "gray" }}>{record?.id}</span>{" "}
           <br />
           <em style={{ fontWeight: 500 }}>
             {intl.formatMessage({
@@ -287,12 +246,7 @@ const App: React.FC<Props> = ({ goDetail }) => {
       width: "16%",
       fixed: "right" as const,
       render: (record: any) => (
-        <ActionColumn
-          record={record}
-          menuItems={menuItems}
-          cbk={fetchTaskList}
-          goDetail={goDetail}
-        />
+        <ActionColumn record={record} cbk={fetchTaskList} goDetail={goDetail} />
       ),
     },
   ];
@@ -555,6 +509,23 @@ const App: React.FC<Props> = ({ goDetail }) => {
               loading={loading}
               rowSelection={{ type: "checkbox", ...rowSelection }}
               scroll={{ x: "max-content", y: "calc(100vh - 450px)" }}
+              className={[
+                "[&_.ant-table]:!rounded-xl",
+                "[&_.ant-table-thead>tr>th]:!bg-slate-50",
+                "[&_.ant-table-thead>tr>th]:!font-bold",
+                "[&_.ant-table-thead>tr>th]:!text-slate-700",
+                "[&_.ant-table-tbody>tr>td]:!border-slate-100",
+                "[&_.ant-table-tbody>tr:hover>td]:!bg-slate-50/70",
+                "[&_.ant-pagination]:!px-1",
+              ].join(" ")}
+              locale={{
+                emptyText: (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="暂无离线同步任务"
+                  />
+                ),
+              }}
             />
           </div>
         </div>
