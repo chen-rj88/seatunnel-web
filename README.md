@@ -9,16 +9,6 @@
 <a href="http://111.230.213.87:9001/">Home</a>
 </p>
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/901d765c-cbd7-4f39-ae3a-de6716ae09f2" width="100%" alt="SeaTunnel Web" />
-</p>
-
-<p align="center">
-  <a href="http://111.230.213.87:8000" target="_blank">Live Demo</a>｜
-  <a href="https://doc.seatunnel-web.com/" target="_blank">Documentation</a>｜
-  <a href="http://111.230.213.87:9001/" target="_blank">Homepage</a>
-</p>
-
 ## SeaTunnel Web
 
 **SeaTunnel Web** is a modern third-party Web UI for **Apache SeaTunnel**, designed to make data synchronization easier, more visual, and more production-friendly.
