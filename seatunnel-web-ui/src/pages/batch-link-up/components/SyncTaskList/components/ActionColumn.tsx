@@ -1,7 +1,10 @@
 import {
   CloudDownloadOutlined,
   CloudUploadOutlined,
+  DeleteOutlined,
   DownOutlined,
+  EditOutlined,
+  EyeOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
 } from "@ant-design/icons";
@@ -16,7 +19,6 @@ import TaskViewModal from "../../../TaskViewModal";
 
 interface ActionColumnProps {
   record: any;
-  menuItems: any[];
   cbk: () => void;
   goDetail: (value: any, item: any) => void;
 }
@@ -32,38 +34,60 @@ const dangerActionClass = `${actionBaseClass} bg-[#fff1f0] text-[#cf1322] hover:
 
 const secondaryActionClass = `${actionBaseClass} bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900`;
 
+const disabledActionClass = `${actionBaseClass} cursor-not-allowed bg-slate-100 text-slate-400`;
+
 const moreActionClass =
   "inline-flex h-7 items-center gap-1 rounded-full px-2 text-xs font-medium text-slate-500 transition-all duration-150 hover:bg-slate-100 hover:text-slate-800";
 
+const isReleaseOnline = (releaseState?: string | number) => {
+  return releaseState === "ONLINE" || releaseState === 1;
+};
+
 const ActionColumn: React.FC<ActionColumnProps> = ({
   record,
-  menuItems,
   cbk,
   goDetail,
 }) => {
   const intl = useIntl();
 
   const ref = useRef<any>(null);
+
   const [runOpen, setRunOpen] = useState(false);
   const [runLoading, setRunLoading] = useState(false);
 
-  const isOnline =
-    record?.releaseState === "ONLINE" || record?.releaseState === 1;
+  const isOnline = isReleaseOnline(record?.releaseState);
+  const isRunning = record?.lastJobStatus === "RUNNING";
+
+  const canRun = isOnline && !isRunning;
+
+  /**
+   * 上线后不能编辑和删除。
+   * 运行中一般也不允许编辑和删除。
+   */
+  const canEdit = !isOnline && !isRunning;
+  const canDelete = !isOnline && !isRunning;
+
+  const stopPropagation = (event: React.MouseEvent<HTMLElement>) => {
+    event.stopPropagation();
+  };
 
   const handleStop = () => {
     const instanceId = record?.instanceId;
 
-    if (instanceId !== undefined) {
-      seatunnelJobExecuteApi.pause(instanceId).then((data) => {
-        if (data?.code === 0) {
-          message.success("停止成功");
-          cbk();
-        } else {
-          message.error(data?.msg || "停止失败");
-          cbk();
-        }
-      });
+    if (instanceId === undefined || instanceId === null) {
+      message.error("任务实例 ID 不存在");
+      return;
     }
+
+    seatunnelJobExecuteApi.pause(instanceId).then((data) => {
+      if (data?.code === 0) {
+        message.success("停止成功");
+        cbk();
+      } else {
+        message.error(data?.msg || "停止失败");
+        cbk();
+      }
+    });
   };
 
   const handleOnline = async () => {
@@ -84,6 +108,11 @@ const ActionColumn: React.FC<ActionColumnProps> = ({
   };
 
   const handleOffline = async () => {
+    if (isRunning) {
+      message.warning("任务正在运行中，请先停止任务后再下线");
+      return;
+    }
+
     if (!record?.id) {
       message.error("任务 ID 不存在");
       return;
@@ -100,7 +129,30 @@ const ActionColumn: React.FC<ActionColumnProps> = ({
     message.error(response?.msg || response?.message || "下线失败");
   };
 
-  const handleDeleteTask = async (record: any) => {
+  const doDeleteTask = async (id: string | number) => {
+    const response = await seatunnelJobDefinitionApi.delete(id);
+
+    if (response?.code === 0) {
+      message.success(response?.msg || "删除成功");
+      cbk();
+    } else {
+      message.error(response?.msg || response?.message || "删除失败");
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!canDelete) {
+      if (isOnline) {
+        message.warning("任务已上线，请先下线后再删除");
+        return;
+      }
+
+      if (isRunning) {
+        message.warning("任务正在运行中，请先停止后再删除");
+        return;
+      }
+    }
+
     confirm({
       title: intl.formatMessage({
         id: "pages.job.action.delete.confirmTitle",
@@ -116,7 +168,7 @@ const ActionColumn: React.FC<ActionColumnProps> = ({
                 "Are you sure you want to delete the task [{name}]?",
             },
             {
-              name: <span style={{ color: "orange" }}>{record.jobName}</span>,
+              name: <span style={{ color: "orange" }}>{record?.jobName}</span>,
             }
           )}
           <br />
@@ -137,7 +189,7 @@ const ActionColumn: React.FC<ActionColumnProps> = ({
       maskClosable: true,
       onOk() {
         if (record?.id) {
-          doDeleteTask(record?.id);
+          doDeleteTask(record.id);
         } else {
           message.error(
             intl.formatMessage({
@@ -150,24 +202,35 @@ const ActionColumn: React.FC<ActionColumnProps> = ({
     });
   };
 
-  const doDeleteTask = async (id: string) => {
-    const response = await seatunnelJobDefinitionApi.delete(id);
+  const handleEdit = async () => {
+    if (!canEdit) {
+      if (isOnline) {
+        message.warning("任务已上线，请先下线后再编辑");
+        return;
+      }
 
-    if (response.code === 0) {
-      message.success(response.msg || "删除成功");
-      cbk();
+      if (isRunning) {
+        message.warning("任务正在运行中，请先停止后再编辑");
+        return;
+      }
+    }
+
+    if (!record?.id) {
+      message.error("任务 ID 不存在");
+      return;
+    }
+
+    const data = await seatunnelJobDefinitionApi.selectEditDetail(record.id);
+
+    if (data?.code === 0) {
+      goDetail(record.id, record);
     } else {
-      message.error(response.msg || "删除失败");
+      message.error(data?.msg || data?.message || "获取任务详情失败");
     }
   };
 
-  const handleMenuClick = (info: any, item: any) => {
+  const handleMenuClick = (info: any) => {
     info.domEvent.stopPropagation();
-
-    if (info?.key === "delete") {
-      handleDeleteTask(record);
-      return;
-    }
 
     if (info?.key === "view") {
       ref.current?.onOpen(true, record, cbk);
@@ -175,11 +238,12 @@ const ActionColumn: React.FC<ActionColumnProps> = ({
     }
 
     if (info?.key === "edit") {
-      seatunnelJobDefinitionApi.selectEditDetail(item?.id).then((data) => {
-        if (data?.code === 0) {
-          goDetail(item?.id, item);
-        }
-      });
+      handleEdit();
+      return;
+    }
+
+    if (info?.key === "delete") {
+      handleDeleteTask();
     }
   };
 
@@ -193,12 +257,46 @@ const ActionColumn: React.FC<ActionColumnProps> = ({
     defaultMessage: "No",
   });
 
-  const canRun = isOnline;
+  const menuItems = [
+    {
+      key: "view",
+      icon: <EyeOutlined />,
+      label: (
+        <span style={{ fontWeight: 500 }}>
+          查看详情
+        </span>
+      ),
+    },
+    {
+      key: "edit",
+      icon: <EditOutlined />,
+      label: (
+        <span style={{ fontWeight: 500 }}>
+          编辑配置
+        </span>
+      ),
+      disabled: !canEdit,
+    },
+    {
+      type: "divider" as const,
+    },
+    {
+      key: "delete",
+      icon: <DeleteOutlined />,
+      label: (
+        <span style={{ fontWeight: 500 }}>
+          删除任务
+        </span>
+      ),
+      danger: true,
+      disabled: !canDelete,
+    },
+  ];
 
   return (
     <>
       <Space size={6} className="whitespace-nowrap">
-        {record?.lastJobStatus === "RUNNING" ? (
+        {isRunning ? (
           <Popconfirm
             title={intl.formatMessage({
               id: "pages.job.action.stop.title",
@@ -219,7 +317,7 @@ const ActionColumn: React.FC<ActionColumnProps> = ({
             <button
               type="button"
               className={dangerActionClass}
-              onClick={(event) => event.stopPropagation()}
+              onClick={stopPropagation}
             >
               <PauseCircleOutlined />
               停止
@@ -284,11 +382,7 @@ const ActionColumn: React.FC<ActionColumnProps> = ({
             <button
               type="button"
               disabled={!canRun}
-              className={
-                canRun
-                  ? primaryActionClass
-                  : `${actionBaseClass} cursor-not-allowed bg-slate-100 text-slate-400`
-              }
+              className={canRun ? primaryActionClass : disabledActionClass}
               onClick={(event) => {
                 event.stopPropagation();
 
@@ -320,7 +414,7 @@ const ActionColumn: React.FC<ActionColumnProps> = ({
             <button
               type="button"
               className={secondaryActionClass}
-              onClick={(event) => event.stopPropagation()}
+              onClick={stopPropagation}
             >
               <CloudDownloadOutlined />
               下线
@@ -343,7 +437,7 @@ const ActionColumn: React.FC<ActionColumnProps> = ({
             <button
               type="button"
               className={secondaryActionClass}
-              onClick={(event) => event.stopPropagation()}
+              onClick={stopPropagation}
             >
               <CloudUploadOutlined />
               上线
@@ -354,16 +448,15 @@ const ActionColumn: React.FC<ActionColumnProps> = ({
         <Dropdown
           trigger={["click"]}
           menu={{
-            items: menuItems.map((menuItem) => ({
-              ...menuItem,
-              onClick: (info) => handleMenuClick(info, record),
-            })),
+            items: menuItems,
+            onClick: handleMenuClick,
           }}
+          placement="bottomLeft"
         >
           <button
             type="button"
             className={moreActionClass}
-            onClick={(event) => event.stopPropagation()}
+            onClick={stopPropagation}
           >
             更多
             <DownOutlined style={{ fontSize: 10 }} />
