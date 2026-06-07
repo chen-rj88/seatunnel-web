@@ -3,8 +3,6 @@ package org.apache.seatunnel.plugin.datasource.api.hocon.table;
 import com.typesafe.config.Config;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.seatunnel.plugin.datasource.api.jdbc.JdbcConfigReaders;
-import org.apache.seatunnel.plugin.datasource.api.jdbc.TablePath;
 import org.apache.seatunnel.web.common.enums.HoconBuildStage;
 
 import java.util.ArrayList;
@@ -27,20 +25,25 @@ public class JdbcMultiSourceTargetBuilder implements JdbcSourceTargetBuilder {
                       Config conn,
                       Map<String, Object> map,
                       HoconBuildStage stage) {
-        String database = JdbcConfigReaders.getString(conn, DATABASE, "");
-        String schema = JdbcConfigReaders.getString(conn, SCHEMA, "");
+        String database = tableNameResolver.resolveDatabase(config, conn);
+        String schema = tableNameResolver.resolveSchema(config, conn);
 
         List<String> sourceTables = tableNameResolver.resolveSourceTableNames(config);
-        List<Map<String, Object>> tableList = buildSourceTableList(database, schema, sourceTables);
+        List<Map<String, Object>> tableList = buildSourceTableList(config, conn, database, schema, sourceTables);
 
         if (CollectionUtils.isEmpty(tableList)) {
             throw new IllegalArgumentException("Missing source table_list, table_list can not be empty");
         }
 
+        if (StringUtils.isNotBlank(database)) {
+            map.put(DATABASE, database.trim());
+        }
         map.put(TABLE_LIST, tableList);
     }
 
     private List<Map<String, Object>> buildSourceTableList(
+            Config config,
+            Config conn,
             String database,
             String schema,
             List<String> sourceTables) {
@@ -51,15 +54,12 @@ public class JdbcMultiSourceTargetBuilder implements JdbcSourceTargetBuilder {
                 continue;
             }
 
-            String tablePath = table.trim();
-
-            if (!tableNameResolver.isFullTablePath(tablePath)) {
-                tablePath = TablePath.of(
-                        normalizeBlank(database),
-                        normalizeBlank(schema),
-                        tablePath
-                ).getFullName();
-            }
+            String tablePath = tableNameResolver.normalizeSourceTablePath(
+                    config,
+                    conn,
+                    database,
+                    schema,
+                    table.trim());
 
             Map<String, Object> item = new LinkedHashMap<>();
             item.put(TABLE_PATH, tablePath);
@@ -67,9 +67,5 @@ public class JdbcMultiSourceTargetBuilder implements JdbcSourceTargetBuilder {
         }
 
         return tableList;
-    }
-
-    private String normalizeBlank(String value) {
-        return StringUtils.isBlank(value) ? null : value.trim();
     }
 }
