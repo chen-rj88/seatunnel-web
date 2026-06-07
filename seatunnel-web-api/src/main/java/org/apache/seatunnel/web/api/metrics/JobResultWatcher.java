@@ -61,7 +61,7 @@ public class JobResultWatcher {
 
                 JobStatus status = parseJobStatus(statusStr);
 
-                if (status == JobStatus.RUNNING) {
+                if (!status.isEndState()) {
                     sleepQuietly();
                     continue;
                 }

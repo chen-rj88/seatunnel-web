@@ -31,6 +31,7 @@ const DataSyncHeader: React.FC<DataSyncHeaderProps> = ({
     setSourceType({
       dbType: value,
       connectorType: option?.connectorType,
+      pluginName: option?.pluginName,
     });
   };
 
@@ -38,6 +39,7 @@ const DataSyncHeader: React.FC<DataSyncHeaderProps> = ({
     setTargetType({
       dbType: value,
       connectorType: option?.connectorType,
+      pluginName: option?.pluginName,
     });
   };
 
