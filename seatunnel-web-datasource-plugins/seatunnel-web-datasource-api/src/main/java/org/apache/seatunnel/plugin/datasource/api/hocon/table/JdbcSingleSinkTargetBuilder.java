@@ -37,6 +37,7 @@ public class JdbcSingleSinkTargetBuilder implements JdbcSinkTargetBuilder {
         String finalDatabase = resolveFinalDatabase(conn, database);
         String finalTable = resolveFinalTable(table, targetTableName, sinkTables);
         finalTable = JdbcSinkSchemaResolver.normalizeSingleTable(config, conn, finalDatabase, finalTable);
+        finalTable = JdbcOracleSchemaResolver.normalizeSingleTable(config, conn, finalTable);
 
         if (StringUtils.isBlank(finalTable)) {
             throw new IllegalArgumentException(
