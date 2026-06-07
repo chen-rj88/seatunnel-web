@@ -1,8 +1,6 @@
-CREATE
-DATABASE IF NOT EXISTS seatunnel_web;
+CREATE DATABASE IF NOT EXISTS seatunnel_web;
 
-use
-seatunnel_web;
+use seatunnel_web;
 
 -- =========================================
 -- 连接器参数元数据表
