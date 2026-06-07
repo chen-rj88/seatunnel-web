@@ -3,7 +3,6 @@ package org.apache.seatunnel.plugin.datasource.api.hocon.table;
 import com.typesafe.config.Config;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.plugin.datasource.api.jdbc.JdbcConfigReaders;
-import org.apache.seatunnel.plugin.datasource.api.jdbc.TablePath;
 import org.apache.seatunnel.web.common.enums.HoconBuildStage;
 import org.apache.seatunnel.web.common.modal.JdbcQueryRenderContext;
 
@@ -39,22 +38,26 @@ public class JdbcSingleSourceTargetBuilder implements JdbcSourceTargetBuilder {
             return;
         }
 
-        String database = JdbcConfigReaders.getString(conn, DATABASE, "");
-        String schema = JdbcConfigReaders.getString(conn, SCHEMA, "");
+        String database = tableNameResolver.resolveDatabase(config, conn);
+        String schema = tableNameResolver.resolveSchema(config, conn);
 
         List<String> sourceTables = tableNameResolver.resolveSourceTableNames(config);
-        String tablePath = resolveTablePath(config, database, schema, sourceTables);
+        String tablePath = resolveTablePath(config, conn, database, schema, sourceTables);
 
         if (StringUtils.isBlank(tablePath)) {
             throw new IllegalArgumentException(
                     "Missing source table, one of query/table_path/table/table_list is required");
         }
 
+        if (StringUtils.isNotBlank(database)) {
+            map.put(DATABASE, database.trim());
+        }
         map.put(TABLE_PATH, tablePath);
     }
 
     private String resolveTablePath(
             Config config,
+            Config conn,
             String database,
             String schema,
             List<String> sourceTables) {
@@ -62,11 +65,7 @@ public class JdbcSingleSourceTargetBuilder implements JdbcSourceTargetBuilder {
         if (StringUtils.isNotBlank(tablePath)) {
             String trimmed = tablePath.trim();
 
-            if (tableNameResolver.isFullTablePath(trimmed)) {
-                return trimmed;
-            }
-
-            return buildTablePath(database, schema, trimmed);
+            return tableNameResolver.normalizeSourceTablePath(config, conn, database, schema, trimmed);
         }
 
         String table = JdbcConfigReaders.getString(config, TABLE, "");
@@ -79,22 +78,6 @@ public class JdbcSingleSourceTargetBuilder implements JdbcSourceTargetBuilder {
         }
 
         String trimmed = table.trim();
-        if (tableNameResolver.isFullTablePath(trimmed)) {
-            return trimmed;
-        }
-
-        return buildTablePath(database, schema, trimmed);
-    }
-
-    private String buildTablePath(String database, String schema, String table) {
-        return TablePath.of(
-                normalizeBlank(database),
-                normalizeBlank(schema),
-                table
-        ).getFullName();
-    }
-
-    private String normalizeBlank(String value) {
-        return StringUtils.isBlank(value) ? null : value.trim();
+        return tableNameResolver.normalizeSourceTablePath(config, conn, database, schema, trimmed);
     }
 }
