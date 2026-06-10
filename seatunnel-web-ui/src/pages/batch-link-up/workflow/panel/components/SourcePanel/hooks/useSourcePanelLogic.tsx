@@ -393,7 +393,6 @@ export function useSourcePanelLogic({
       });
 
       if (res?.code !== 0) {
-        message.error(res?.message || "SQL 生成失败");
         return;
       }
 
@@ -408,7 +407,6 @@ export function useSourcePanelLogic({
       message.success("SQL 生成成功");
     } catch (error) {
       console.error("generate sql error", error);
-      message.error("SQL 生成失败");
     } finally {
       setGenerateSqlLoading(false);
     }

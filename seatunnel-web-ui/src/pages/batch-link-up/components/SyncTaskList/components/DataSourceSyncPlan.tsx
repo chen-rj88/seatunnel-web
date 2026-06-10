@@ -9,6 +9,7 @@ interface DataSourceSyncPlanProps {
 }
 
 const DataSourceSyncPlan: React.FC<DataSourceSyncPlanProps> = ({ record }) => {
+  console.log(record);
   const animatedIconStyle: CSSProperties = {
     fontSize: 10,
     animation: "float 2s ease-in-out infinite",

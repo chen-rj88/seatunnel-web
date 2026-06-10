@@ -254,7 +254,6 @@ export function useSinkPanelLogic({
       });
 
       if (res?.code !== 0) {
-        message.error(res?.message || "SQL 生成失败");
         return;
       }
 
@@ -266,10 +265,8 @@ export function useSinkPanelLogic({
 
       updateNode({ sql: nextSql });
       setSqlPopoverOpen(false);
-      message.success("SQL 生成成功");
     } catch (error) {
       console.error("generate sink sql error", error);
-      message.error("SQL 生成失败");
     } finally {
       setGenerateSqlLoading(false);
     }
