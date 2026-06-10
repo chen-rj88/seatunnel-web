@@ -11,7 +11,7 @@ export const PAGE_DEFAULT_PAGINATION = {
 export const COMMON_DB_OPTIONS: DataSourceOptionItem[] = [
   { label: "MYSQL", value: "MYSQL" },
   { label: "ORACLE", value: "ORACLE" },
-  { label: "PGSQL", value: "POSTGRE_SQL" },
+  { label: "POSTGRE_SQL", value: "POSTGRE_SQL" },
 ];
 
 export const ENVIRONMENT_OPTIONS: DataSourceOptionItem[] = [

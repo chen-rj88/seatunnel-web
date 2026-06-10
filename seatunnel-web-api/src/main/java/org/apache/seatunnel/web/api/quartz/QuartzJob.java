@@ -54,7 +54,7 @@ public class QuartzJob implements Job {
                     jobDefineId, scheduleId, refire, e);
 
             JobExecutionException jee = new JobExecutionException(e);
-            jee.setRefireImmediately(refire);
+            jee.setRefireImmediately(false);
             throw jee;
         }
     }

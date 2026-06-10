@@ -161,19 +161,11 @@ const AddOrEditDataSourceModal = forwardRef<DataSourceModalRef>((_, ref) => {
           return;
         }
 
-        message.error(
-          intl.formatMessage({
-            id: "pages.datasource.modal.message.fail",
-            defaultMessage: "Fail",
-          })
-        );
         return;
       }
 
-      message.error(response.message || response.msg || "连接测试失败");
     } catch (error: any) {
       if (error?.errorFields) return;
-      message.error(error?.message || "连接测试失败");
     }
   };
 
@@ -192,26 +184,20 @@ const AddOrEditDataSourceModal = forwardRef<DataSourceModalRef>((_, ref) => {
         const response = await createDataSource(payload);
 
         if (response.code !== 0) {
-          message.error(response.message || response.msg || "创建数据源失败");
+          // message.error(response.message || response.msg || "创建数据源失败");
           return;
         }
       }
 
       if (isEditMode) {
         if (!currentRecord?.id) {
-          message.error(
-            intl.formatMessage({
-              id: "pages.datasource.message.idNotExist",
-              defaultMessage: "id does not exist",
-            })
-          );
+          
           return;
         }
 
         const response = await updateDataSource(currentRecord.id, payload);
 
         if (response.code !== 0) {
-          message.error(response.message || response.msg || "更新数据源失败");
           return;
         }
       }
@@ -227,7 +213,6 @@ const AddOrEditDataSourceModal = forwardRef<DataSourceModalRef>((_, ref) => {
       successCallbackRef.current?.();
     } catch (error: any) {
       if (error?.errorFields) return;
-      message.error(error?.message || "保存失败");
     }
   };
 

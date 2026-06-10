@@ -31,7 +31,7 @@ const DatabaseIcons = ({
   height = '20px',
 }: DatabaseIconsProps) => {
   const normalizedType = dbType?.toLowerCase?.();
-
+  console.log(normalizedType);
   const fallbackStyle: CSSProperties = {
     fontSize: width,
     width,
@@ -50,7 +50,7 @@ const DatabaseIcons = ({
       return <DorisIcon width={width} height={height} />;
     case 'elasticsearch':
       return <ElasticSearchIcon width={width} height={height} />;
-    case 'pgsql':
+    case 'postgre_sql':
       return <PsSqlIcon width={width} height={height} />;
     case 'opengauss':
       return <OpenGaussIcon width={width} height={height} />;
