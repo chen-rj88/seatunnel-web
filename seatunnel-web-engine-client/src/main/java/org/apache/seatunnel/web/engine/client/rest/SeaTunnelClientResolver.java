@@ -25,10 +25,7 @@ public class SeaTunnelClientResolver {
         SeaTunnelClientAuth auth = new SeaTunnelClientAuth();
         auth.setAuthEnabled(client.getAuthEnabled());
         auth.setUsername(client.getUsername());
-
-        // 如果数据库里是加密密码，这里解密
         auth.setPassword(client.getPassword());
-
         return auth;
     }
 }
