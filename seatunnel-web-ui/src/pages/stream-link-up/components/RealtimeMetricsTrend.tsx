@@ -1,3 +1,5 @@
+import { DashboardOutlined } from "@ant-design/icons";
+import { Tooltip } from "antd";
 import * as echarts from "echarts";
 import React, { useEffect, useMemo, useRef } from "react";
 
@@ -10,10 +12,8 @@ interface MetricPoint {
 }
 
 interface RealtimeMetricsTrendProps {
-  record: {
-    recentMetrics?: MetricPoint[];
-    latestMetrics?: MetricPoint;
-  };
+  record: any;
+  onView?: (record: any) => void;
 }
 
 const toNumber = (value: any, fallback = 0) => {
@@ -25,8 +25,12 @@ const formatNumber = (value: any) => {
   return toNumber(value).toLocaleString();
 };
 
+const dashboardIconClass =
+  "absolute bottom-1 right-1 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#d6e4ff] bg-white/95 text-xs text-[#3157d5] opacity-0 shadow-sm backdrop-blur transition-all duration-150 hover:bg-[#eef3ff] hover:text-[#2448c2] group-hover:opacity-100";
+
 const RealtimeMetricsTrend: React.FC<RealtimeMetricsTrendProps> = ({
   record,
+  onView,
 }) => {
   const chartRef = useRef<HTMLDivElement | null>(null);
 
@@ -50,6 +54,11 @@ const RealtimeMetricsTrend: React.FC<RealtimeMetricsTrendProps> = ({
   const latestWriteRows = latest.writeRowCount;
   const latestReadQps = latest.readQps ?? 0;
   const latestWriteQps = latest.writeQps;
+
+  const handleOpenDashboard = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    onView?.(record);
+  };
 
   useEffect(() => {
     if (!chartRef.current || !points.length) return;
@@ -152,12 +161,33 @@ const RealtimeMetricsTrend: React.FC<RealtimeMetricsTrendProps> = ({
     };
   }, [points, rowValues, qpsValues]);
 
+  const renderDashboardIcon = () => {
+    if (!onView) return null;
+
+    return (
+      <Tooltip title="打开实时指标看板">
+        <button
+          type="button"
+          className={dashboardIconClass}
+          onClick={handleOpenDashboard}
+        >
+          <DashboardOutlined />
+        </button>
+      </Tooltip>
+    );
+  };
+
   if (!points.length) {
-    return <span className="text-xs text-slate-400">暂无趋势数据</span>;
+    return (
+      <div className="group relative min-h-[54px] w-[350px]">
+        <span className="text-xs text-slate-400">暂无趋势数据</span>
+        {renderDashboardIcon()}
+      </div>
+    );
   }
 
   return (
-    <div className="w-[350px]">
+    <div className="group relative w-[350px]">
       <div className="mb-1 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-xs font-bold text-slate-700">条数</div>
@@ -189,6 +219,8 @@ const RealtimeMetricsTrend: React.FC<RealtimeMetricsTrendProps> = ({
       </div>
 
       <div ref={chartRef} className="h-[54px] w-[350px]" />
+
+      {renderDashboardIcon()}
     </div>
   );
 };
