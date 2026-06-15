@@ -7,14 +7,13 @@ import {
   fetchDataSourceOptions,
 } from "@/pages/data-source/service";
 
-import { seatunnelJobDefinitionApi } from "@/pages/batch-link-up/api";
+import { seatunnelStremJobDefinitionApi } from "@/pages/stream-link-up/api";
 import {
   buildTableItems,
   DEFAULT_DB_TYPE,
   DEFAULT_FORM_VALUES,
 } from "../config";
 import { DbTypeValue, RightPanelTab, TableItem } from "../types";
-import { seatunnelStremJobDefinitionApi } from "@/pages/stream-link-up/api";
 
 interface UseMultiWorkflowStateProps {
   form: FormInstance;
@@ -503,7 +502,7 @@ export function useMultiWorkflowState({
         content: workflowData,
       };
 
-      const res = await seatunnelJobDefinitionApi.saveOrUpdateGuideMulti(
+      const res = await seatunnelStremJobDefinitionApi.saveOrUpdateGuideMulti(
         finalPayload
       );
 
