@@ -1,6 +1,6 @@
 import { message, Modal } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { seatunnelJobDefinitionApi } from "@/pages/batch-link-up/api";
+import { seatunnelStremJobDefinitionApi } from "@/pages/stream-link-up/api";
 import { hoconTemplateApi } from "../hoconTemplateApi";
 
 interface UseCustomWorkflowStateProps {
@@ -223,7 +223,7 @@ export function useCustomWorkflowState({
       setPublishLoading(true);
 
       const finalPayload = buildFinalPayload();
-      const res = await seatunnelJobDefinitionApi.saveOrUpdateScript(
+      const res = await seatunnelStremJobDefinitionApi.saveOrUpdateScript(
         finalPayload
       );
 
@@ -269,7 +269,7 @@ export function useCustomWorkflowState({
       setPreviewLoading(true);
 
       const finalPayload = buildFinalPayload();
-      const res = await seatunnelJobDefinitionApi.buildScriptConfig(
+      const res = await seatunnelStremJobDefinitionApi.buildScriptConfig(
         finalPayload
       );
 
