@@ -91,6 +91,8 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
   const canRun = isOnline && !isRunning;
   const canOffline = isOnline && !isRunning;
 
+  const disableEditOrDelete = isOnline || isRunning;
+
   const stopPropagation = (event: React.MouseEvent<HTMLElement>) => {
     event.stopPropagation();
   };
@@ -251,7 +253,6 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
           onOpenChange={(open) => {
             if (!canOffline) {
               if (isRunning) {
-               
               }
 
               return;
@@ -301,9 +302,7 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
           title="任务上线"
           description={
             <div className="mr-3">
-              上线后任务将恢复可运行状态，并同步恢复调度，
-              <br />
-              确认上线该任务吗？
+              上线后任务将恢复可运行状态，确认上线该任务吗？
             </div>
           }
           okText="确认"
@@ -339,7 +338,7 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
               key: "edit",
               icon: <EditOutlined />,
               label: "编辑配置",
-              disabled: isRunning,
+              disabled: disableEditOrDelete,
             },
             {
               type: "divider",
@@ -349,7 +348,7 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
               icon: <DeleteOutlined />,
               label: "删除任务",
               danger: true,
-              disabled: isRunning,
+              disabled: disableEditOrDelete,
             },
           ],
           onClick: (info) => {
@@ -361,6 +360,11 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
             }
 
             if (info.key === "edit") {
+              if (disableEditOrDelete) {
+                message.warning("任务已上线，请先下线后再编辑");
+                return;
+              }
+
               onEdit?.(record);
               return;
             }
@@ -376,6 +380,11 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
             }
 
             if (info.key === "delete") {
+              if (disableEditOrDelete) {
+                message.warning("任务已上线，请先下线后再删除");
+                return;
+              }
+
               onDelete?.(record);
             }
           },

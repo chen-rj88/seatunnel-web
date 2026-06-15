@@ -100,7 +100,7 @@ const RealtimeTaskTable: React.FC<RealtimeTaskTableProps> = ({
       dataIndex: "metricsTrend",
       width: 360,
       render: (_content: any, record: StreamingJobDefinitionVO) => (
-        <RealtimeMetricsTrend record={record} />
+        <RealtimeMetricsTrend record={record} onView={onView}/>
       ),
     },
     {
