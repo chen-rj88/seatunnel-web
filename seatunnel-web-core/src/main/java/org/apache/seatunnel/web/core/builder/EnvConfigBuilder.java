@@ -3,23 +3,32 @@ package org.apache.seatunnel.web.core.builder;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import com.typesafe.config.ConfigRenderOptions;
-import org.apache.seatunnel.web.spi.bean.dto.config.BatchJobEnvConfig;
+import org.apache.seatunnel.web.core.builder.env.EnvConfigExtender;
 import org.apache.seatunnel.web.spi.bean.dto.config.JobEnvConfig;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Component
 public class EnvConfigBuilder {
 
+    private final List<EnvConfigExtender> extenders;
+
+    public EnvConfigBuilder(List<EnvConfigExtender> extenders) {
+        this.extenders = extenders;
+    }
+
     public String build(JobEnvConfig envConfig) {
         if (envConfig == null) {
-            throw new IllegalArgumentException("JobBasicConfig cannot be null");
+            throw new IllegalArgumentException("JobEnvConfig cannot be null");
         }
 
         Map<String, Object> envMap = new LinkedHashMap<>();
+
         fillCommonConfig(envMap, envConfig);
+        fillExtConfig(envMap, envConfig);
 
         Config cfg = ConfigFactory.parseMap(envMap);
         return cfg.root().render(
@@ -40,4 +49,15 @@ public class EnvConfigBuilder {
         }
     }
 
+    private void fillExtConfig(Map<String, Object> envMap, JobEnvConfig envConfig) {
+        if (extenders == null || extenders.isEmpty()) {
+            return;
+        }
+
+        for (EnvConfigExtender extender : extenders) {
+            if (extender.supports(envConfig)) {
+                extender.fill(envMap, envConfig);
+            }
+        }
+    }
 }
