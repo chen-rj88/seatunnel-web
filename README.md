@@ -76,5 +76,6 @@ If you’d like to be among the first to try the adapted version of SeaTunnel We
 or help us build the ecosystem from **0 to 1**, you are warmly welcome to join the **SeaTunnel Web Early Co-Creation Group**.
 
 Being a contributor here isn’t just about writing code or documentation—anyone who **shares ideas**, **gives feedback**, or **talks about SeaTunnel** can be a valued part of the project. Your **voice matters** in shaping the future of SeaTunnel Web!
-<img width="200" height="320" alt="6f25c5941f5734a722092802c6bb6359" src="https://github.com/user-attachments/assets/6028b750-f63f-4390-82ec-cdcda96f8947" />
+
+<img width="200" height="320" alt="ac7a0f42d12f7cb3c211cb255de1e46e" src="https://github.com/user-attachments/assets/9389015b-b497-4a20-ba87-e3c570299f16" />
 
