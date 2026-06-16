@@ -193,6 +193,7 @@ export default function Workflow({
   }, [params?.id, currentSignature]);
 
   const buildEnvData = () => {
+    console.log(envConfig);
     return {
       ...envConfig,
     };

@@ -84,6 +84,7 @@ export default function SingleConfigPage() {
   const [envConfig, setEnvConfig] = useState<EnvConfig>({
     jobMode: "STREAMING",
     parallelism: 1,
+    checkpointInterval: 30000,
   });
   const [basicConfig, setBasicConfig] =
     useState<BasicConfig>(defaultBasicConfig);
@@ -162,7 +163,7 @@ export default function SingleConfigPage() {
       return;
     }
 
-    // 兜底逻辑：有缓存优先视为新建，否则按编辑处理
+    
     const cache = sessionStorage.getItem(cacheKey);
     if (cache) {
       initCreate();

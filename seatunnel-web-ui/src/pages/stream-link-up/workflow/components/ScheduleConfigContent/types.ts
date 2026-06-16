@@ -18,11 +18,13 @@ export interface BasicConfig {
 export interface EnvConfig {
   jobMode: "BATCH" | "STREAMING";
   parallelism: number;
+  checkpointInterval: number;
 }
 
 export const defaultEnvConfig: EnvConfig = {
   jobMode: "STREAMING",
   parallelism: 1,
+  checkpointInterval: 30000,
 };
 
 export interface ScheduleConfig {
