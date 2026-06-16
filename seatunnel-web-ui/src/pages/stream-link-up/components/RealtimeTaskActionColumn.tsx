@@ -36,7 +36,7 @@ export interface StreamingJobDefinitionVO {
 interface RealtimeTaskActionColumnProps {
   record: StreamingJobDefinitionVO;
 
-  onView?: (record: StreamingJobDefinitionVO) => void;
+  onDetail?: (record: StreamingJobDefinitionVO) => void;
   onEdit?: (record: StreamingJobDefinitionVO) => void;
   onRun?: (record: StreamingJobDefinitionVO) => Promise<void> | void;
   onStop?: (record: StreamingJobDefinitionVO) => Promise<void> | void;
@@ -67,7 +67,7 @@ const isReleaseOnline = (releaseState?: string | number) => {
 
 const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
   record,
-  onView,
+  onDetail,
   onEdit,
   onRun,
   onStop,
@@ -355,7 +355,7 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
             info.domEvent.stopPropagation();
 
             if (info.key === "view") {
-              onView?.(record);
+              onDetail?.(record);
               return;
             }
 
