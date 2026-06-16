@@ -1,6 +1,12 @@
 import { Divider, message, Modal } from "antd";
 import moment from "moment";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { history } from "umi";
 
 import {
@@ -10,9 +16,10 @@ import {
 import BottomActionBar from "./components/BottomActionBar";
 import RealtimeHeader from "./components/RealtimeHeader";
 import RealtimeTaskTable from "./components/RealtimeTaskTable";
+import RealtimeTaskViewModal from "./components/RealtimeTaskViewModal";
 import SearchToolbar from "./components/SearchToolbar";
 import StreamingHelperSection from "./components/StreamingHelperSection";
-import RealtimeTaskViewModal from "./components/RealtimeTaskViewModal";
+import TaskViewModal from "./components/TaskViewModal";
 
 const REALTIME_DETAIL_CACHE_PREFIX = "stream-link-up-detail";
 
@@ -167,7 +174,7 @@ const RealtimeSyncPage: React.FC = () => {
   });
 
   const ref = useRef(null);
-
+  const refDetail = useRef(null);
   const [searchValues, setSearchValues] = useState<SearchValues>(() =>
     parseSearchParamsFromUrl()
   );
@@ -258,7 +265,6 @@ const RealtimeSyncPage: React.FC = () => {
       const res = await seatunnelStremJobDefinitionApi.page(queryParams);
 
       if (res?.code !== undefined && res.code !== 0) {
-
         setDataSource([]);
         setPagination((prev) => ({
           ...prev,
@@ -275,7 +281,6 @@ const RealtimeSyncPage: React.FC = () => {
         total: nextTotal || 0,
       }));
     } catch (error) {
-
       setDataSource([]);
       setPagination((prev) => ({
         ...prev,
@@ -378,6 +383,11 @@ const RealtimeSyncPage: React.FC = () => {
     ref.current?.onOpen(true, record, () => {});
   };
 
+  const handleDetail = (record: StreamingJobDefinitionVO) => {
+    console.log("123")
+    refDetail.current?.onOpen(true, record, () => {});
+  };
+
   const handleEdit = async (item: StreamingJobDefinitionVO) => {
     if (!item?.id) {
       message.warning("任务ID不能为空");
@@ -404,11 +414,7 @@ const RealtimeSyncPage: React.FC = () => {
         history.push(`/sync/stream-link-up/${id}/config/script?scene=edit`);
         return;
       }
-
-      
-    } catch (error) {
-      
-    }
+    } catch (error) {}
   };
 
   const handleRun = async (record: StreamingJobDefinitionVO) => {
@@ -620,63 +626,65 @@ const RealtimeSyncPage: React.FC = () => {
 
   return (
     <>
-    <div className="min-h-screen px-6 pb-24 pt-7 text-slate-950">
-      <RealtimeHeader
-        sourceType={sourceType}
-        sinkType={sinkType}
-        onSourceChange={setSourceType}
-        onSinkChange={setSinkType}
-        onCreate={handleCreate}
-        creating={creating}
-      />
-
-      <div className="mb-5 overflow-hidden">
-        <SearchToolbar
-          initialValues={searchValues}
-          onSearch={handleSearch}
-          onReset={handleReset}
+      <div className="min-h-screen px-6 pb-24 pt-7 text-slate-950">
+        <RealtimeHeader
+          sourceType={sourceType}
+          sinkType={sinkType}
+          onSourceChange={setSourceType}
+          onSinkChange={setSinkType}
+          onCreate={handleCreate}
+          creating={creating}
         />
 
-        <Divider style={{ padding: 0, margin: "16px 0" }} />
+        <div className="mb-5 overflow-hidden">
+          <SearchToolbar
+            initialValues={searchValues}
+            onSearch={handleSearch}
+            onReset={handleReset}
+          />
 
-        <RealtimeTaskTable
-          loading={loading}
-          dataSource={dataSource}
-          selectedRowKeys={selectedRowKeys}
-          onSelectedRowKeysChange={setSelectedRowKeys}
-          pagination={false}
-          onView={handleView}
-          onEdit={handleEdit}
-          onRun={handleRun}
-          onStop={handleStop}
-          onOnline={handleOnline}
-          onOffline={handleOffline}
-          onDelete={handleDelete}
-          onLog={handleLog}
-          onCheckpoint={handleCheckpoint}
+          <Divider style={{ padding: 0, margin: "16px 0" }} />
+
+          <RealtimeTaskTable
+            loading={loading}
+            dataSource={dataSource}
+            selectedRowKeys={selectedRowKeys}
+            onSelectedRowKeysChange={setSelectedRowKeys}
+            pagination={false}
+            onView={handleView}
+            onDetail={handleDetail}
+            onEdit={handleEdit}
+            onRun={handleRun}
+            onStop={handleStop}
+            onOnline={handleOnline}
+            onOffline={handleOffline}
+            onDelete={handleDelete}
+            onLog={handleLog}
+            onCheckpoint={handleCheckpoint}
+          />
+        </div>
+
+        {!loading && dataSource.length <= 1 ? (
+          <>
+            <Divider style={{ padding: 0, margin: "12px 0" }} />
+            <StreamingHelperSection />
+          </>
+        ) : null}
+
+        <BottomActionBar
+          total={pagination.total}
+          selectedCount={selectedRowKeys.length}
+          disabled={!hasSelected}
+          onStart={handleBatchStart}
+          onStop={handleBatchStop}
+          current={pagination.current}
+          pageSize={pagination.pageSize}
+          onPageChange={handlePaginationChange}
         />
       </div>
-
-      {!loading && dataSource.length <= 1 ? (
-        <>
-          <Divider style={{ padding: 0, margin: "12px 0" }} />
-          <StreamingHelperSection />
-        </>
-      ) : null}
-
-      <BottomActionBar
-        total={pagination.total}
-        selectedCount={selectedRowKeys.length}
-        disabled={!hasSelected}
-        onStart={handleBatchStart}
-        onStop={handleBatchStop}
-        current={pagination.current}
-        pageSize={pagination.pageSize}
-        onPageChange={handlePaginationChange}
-      />
-    </div>
-    <RealtimeTaskViewModal ref={ref}/></>
-    
+      <RealtimeTaskViewModal ref={ref} />
+      <TaskViewModal ref={refDetail} />
+    </>
   );
 };
 
