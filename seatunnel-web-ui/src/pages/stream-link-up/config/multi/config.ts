@@ -1,3 +1,5 @@
+
+import { CDC_SERVER_ID_DEFAULTS } from '../serverId';
 import type { DbTypeValue, TableItem } from './types';
 
 export const DEFAULT_DB_TYPE: DbTypeValue = {
@@ -14,8 +16,10 @@ export const DEFAULT_FORM_VALUES = {
   batchSize: 10000,
   enableUpsert: true,
   fieldIde: 'ORIGINAL',
+  ...CDC_SERVER_ID_DEFAULTS,
   serverIdMode: 'MANUAL',
   serverId: '',
+
 };
 
 export const SCHEMA_SAVE_MODE_OPTIONS = [
@@ -53,8 +57,7 @@ export const buildTableItems = (list: any[] = []): TableItem[] => {
       rawTitle: String(tableName).toLowerCase(),
     };
   });
-};
-
+}
 export const SERVER_ID_PATTERN = /^(?:[1-9]\d*)(?:-(?:[1-9]\d*))?$/;
 
 export const validateServerIdRange = (value?: string) => {
@@ -93,3 +96,4 @@ export const validateServerIdRange = (value?: string) => {
 
   return { valid: true };
 };
+
