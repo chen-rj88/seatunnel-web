@@ -29,6 +29,7 @@ interface ExtraParamsConfigProps {
       dbType?: string;
       connectorType?: string;
       connectorName?: string;
+      pluginName?: string;
     };
   };
   hideHeader?: boolean;
@@ -46,7 +47,7 @@ const ExtraParamsConfig: FC<ExtraParamsConfigProps> = ({
   const [paramOptions, setParamOptions] = useState<ConnectorParamOptionVO[]>([]);
   const [loading, setLoading] = useState(false);
   console.log(selectedNode);
-  const connectorName = selectedNode?.data?.connectorName || DEFAULT_CONNECTOR_NAME;
+  const connectorName = selectedNode?.data?.pluginName || DEFAULT_CONNECTOR_NAME;
 
   useEffect(() => {
     let ignore = false;

@@ -51,7 +51,7 @@ const ExtraParamsConfig: FC<ExtraParamsConfigProps> = ({
 
   const connectorType =
     selectedNode?.data?.connectorType || DEFAULT_CONNECTOR_TYPE;
-
+  console.log(selectedNode);
   useEffect(() => {
     let ignore = false;
 
@@ -62,7 +62,7 @@ const ExtraParamsConfig: FC<ExtraParamsConfigProps> = ({
         const res = await fetchConnectorParamOptions({
           type: DEFAULT_PARAM_TYPE,
           connectorName,
-          connectorType,
+          connectorType: "sink",
         });
 
         if (ignore) {
