@@ -1,12 +1,22 @@
-import { Button, Divider, Input, InputNumber, Segmented, Select, Tooltip } from "antd";
-import { BarChart3, Clock3, Database, Eye } from "lucide-react";
-import { memo, useMemo, useRef } from "react";
-import PanelShell from "../PanelShell";
-import ExtraParamsConfig from "./ExtraParamsConfig";
-
-import QualityDetail from "@/pages/batch-link-up/DataViewSQL";
-import { useSourcePanelLogic } from "./hooks/useSourcePanelLogic";
-import "./index.less";
+import {
+  Alert,
+  Button,
+  Divider,
+  Input,
+  InputNumber,
+  Radio,
+  Segmented,
+  Select,
+  Tooltip,
+} from 'antd';
+import { BarChart3, Clock3, Database, Eye } from 'lucide-react';
+import { memo, useMemo, useRef } from 'react';
+import QualityDetail from '@/pages/batch-link-up/DataViewSQL';
+import { validateServerIdRange } from '@/pages/stream-link-up/config/serverId';
+import PanelShell from '../PanelShell';
+import ExtraParamsConfig from './ExtraParamsConfig';
+import { useSourcePanelLogic } from './hooks/useSourcePanelLogic';
+import './index.less';
 
 interface Props {
   selectedNode: any;
@@ -17,28 +27,28 @@ interface Props {
 
 const STARTUP_MODE_OPTIONS = [
   {
-    label: "initial",
-    value: "initial",
-    shortDesc: "全量 + 增量",
-    desc: "先同步历史全量数据，再继续同步增量 binlog",
+    label: 'initial',
+    value: 'initial',
+    shortDesc: '全量 + 增量',
+    desc: '先同步历史全量数据，再继续同步增量 binlog',
   },
   {
-    label: "latest",
-    value: "latest",
-    shortDesc: "仅新增变更",
-    desc: "从最新 binlog 位点开始，只同步启动后的新增变更",
+    label: 'latest',
+    value: 'latest',
+    shortDesc: '仅新增变更',
+    desc: '从最新 binlog 位点开始，只同步启动后的新增变更',
   },
   {
-    label: "specific",
-    value: "specific",
-    shortDesc: "指定 binlog",
-    desc: "从指定 binlog 文件和 position 开始同步",
+    label: 'specific',
+    value: 'specific',
+    shortDesc: '指定 binlog',
+    desc: '从指定 binlog 文件和 position 开始同步',
   },
   {
-    label: "timestamp",
-    value: "timestamp",
-    shortDesc: "指定时间戳",
-    desc: "从指定时间戳开始同步",
+    label: 'timestamp',
+    value: 'timestamp',
+    shortDesc: '指定时间戳',
+    desc: '从指定时间戳开始同步',
   },
 ];
 
@@ -76,22 +86,25 @@ function SourcePanel({
 
   const sourceConfig = selectedNode?.data?.config || {};
 
-  const startupMode = sourceConfig.startupMode || "initial";
-  const startupSpecificOffsetFile = sourceConfig.startupSpecificOffsetFile || "";
+  const startupMode = sourceConfig.startupMode || 'initial';
+  const startupSpecificOffsetFile =
+    sourceConfig.startupSpecificOffsetFile || '';
   const startupSpecificOffsetPos = sourceConfig.startupSpecificOffsetPos;
   const startupTimestamp = sourceConfig.startupTimestamp;
+  const serverIdMode = sourceConfig.serverIdMode || 'MANUAL';
+  const serverId = sourceConfig.serverId || sourceConfig['server-id'] || '';
 
   const startupModeDesc = useMemo(() => {
     return (
       STARTUP_MODE_OPTIONS.find((item) => item.value === startupMode)?.desc ||
-      "配置 CDC 启动读取位点"
+      '配置 CDC 启动读取位点'
     );
   }, [startupMode]);
 
   const resetSchemaMeta = {
     outputSchema: [],
-    schemaStatus: "idle",
-    schemaError: "",
+    schemaStatus: 'idle',
+    schemaError: '',
   };
 
   const handleStartupModeChange = (value: string) => {
@@ -101,13 +114,13 @@ function SourcePanel({
 
         // 切换模式时清理无关字段，避免 HOCON 误带参数
         startupSpecificOffsetFile:
-          value === "specific" ? startupSpecificOffsetFile : undefined,
+          value === 'specific' ? startupSpecificOffsetFile : undefined,
         startupSpecificOffsetPos:
-          value === "specific" ? startupSpecificOffsetPos : undefined,
-        startupTimestamp: value === "timestamp" ? startupTimestamp : undefined,
+          value === 'specific' ? startupSpecificOffsetPos : undefined,
+        startupTimestamp: value === 'timestamp' ? startupTimestamp : undefined,
       },
       undefined,
-      resetSchemaMeta
+      resetSchemaMeta,
     );
   };
 
@@ -152,7 +165,7 @@ function SourcePanel({
                 showSearch
                 optionFilterProp="label"
                 className="workflow-panel__antd-select"
-                style={{ width: "100%" }}
+                style={{ width: '100%' }}
                 popupClassName="workflow-panel__dropdown"
               />
             </div>
@@ -163,13 +176,13 @@ function SourcePanel({
           <div className="workflow-panel__group">
             <div
               className="workflow-panel__group-head"
-              style={{ display: "flex", justifyContent: "space-between" }}
+              style={{ display: 'flex', justifyContent: 'space-between' }}
             >
               <div>
                 <div className="workflow-panel__group-kicker">读取方式</div>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center" }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
                 <Tooltip title="预览读取结果样例数据">
                   <Button
                     size="small"
@@ -184,7 +197,7 @@ function SourcePanel({
 
                 <Divider
                   type="vertical"
-                  style={{ padding: 0, margin: "0 4px" }}
+                  style={{ padding: 0, margin: '0 4px' }}
                 />
 
                 <Tooltip title="解析当前 CDC 表结构字段">
@@ -209,14 +222,14 @@ function SourcePanel({
                     tableNames: value ? [value] : [],
                   },
                   undefined,
-                  resetSchemaMeta
+                  resetSchemaMeta,
                 )
               }
               options={tableOptions}
               loading={tableLoading}
               placeholder="请选择需要 CDC 订阅的来源表"
               className="workflow-panel__antd-select"
-              style={{ width: "100%" }}
+              style={{ width: '100%' }}
               popupClassName="workflow-panel__dropdown"
               showSearch
               optionFilterProp="rawLabel"
@@ -258,7 +271,7 @@ function SourcePanel({
                 />
               </div>
 
-              {startupMode === "specific" && (
+              {startupMode === 'specific' && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <div className="mb-1.5 text-xs font-medium text-slate-500">
@@ -283,7 +296,7 @@ function SourcePanel({
                       value={startupSpecificOffsetPos}
                       min={0}
                       placeholder="请输入 position"
-                      style={{ width: "100%" }}
+                      style={{ width: '100%' }}
                       onChange={(value) =>
                         updateNode({
                           startupSpecificOffsetPos: value,
@@ -294,7 +307,7 @@ function SourcePanel({
                 </div>
               )}
 
-              {startupMode === "timestamp" && (
+              {startupMode === 'timestamp' && (
                 <div>
                   <div className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-slate-500">
                     <Clock3 size={13} />
@@ -305,7 +318,7 @@ function SourcePanel({
                     value={startupTimestamp}
                     min={0}
                     placeholder="请输入毫秒时间戳，如 1714521600000"
-                    style={{ width: "100%" }}
+                    style={{ width: '100%' }}
                     onChange={(value) =>
                       updateNode({
                         startupTimestamp: value,
@@ -315,6 +328,58 @@ function SourcePanel({
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="workflow-panel__divider" />
+
+          <div className="workflow-panel__group">
+            <div className="workflow-panel__group-head">
+              <div>
+                <div className="workflow-panel__group-kicker">Server ID</div>
+                <div className="mt-1 text-xs text-slate-400">
+                  显式配置 MySQL-CDC server-id，避免多个 CDC 任务随机值冲突
+                </div>
+              </div>
+            </div>
+
+            <Alert
+              type="info"
+              showIcon
+              className="mb-3"
+              message="支持单个 ID 或连续区间，例如 5400 或 5400-5408；同一个 MySQL 集群内必须唯一。"
+            />
+
+            <Radio.Group
+              value={serverIdMode}
+              onChange={(event) =>
+                updateNode({
+                  serverIdMode: event.target.value,
+                })
+              }
+              className="mb-3"
+            >
+              <Radio value="MANUAL">手动指定</Radio>
+              <Radio value="AUTO" disabled>
+                平台自动分配
+              </Radio>
+            </Radio.Group>
+
+            <Input
+              value={serverId}
+              disabled={serverIdMode === 'AUTO'}
+              placeholder="例如：5400 或 5400-5408"
+              status={
+                validateServerIdRange(serverId).valid ? undefined : 'error'
+              }
+              onChange={(event) => {
+                const value = event.target.value;
+                updateNode({
+                  serverId: value,
+                  'server-id': value.trim() || undefined,
+                });
+              }}
+              allowClear
+            />
           </div>
 
           <div className="workflow-panel__divider" />

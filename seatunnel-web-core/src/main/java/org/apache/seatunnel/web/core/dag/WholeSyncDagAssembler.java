@@ -130,6 +130,13 @@ public final class WholeSyncDagAssembler {
         }
     }
 
+    private static void appendOptionalText(ObjectNode data, JsonNode source, String fieldName) {
+        JsonNode value = source.get(fieldName);
+        if (value != null && !value.isNull() && !value.asText().trim().isEmpty()) {
+            data.put(fieldName, value.asText());
+        }
+    }
+
     private static void appendExtraParams(
             ObjectNode data,
             JsonNode parentNode,
@@ -185,6 +192,9 @@ public final class WholeSyncDagAssembler {
 
             data.put("fetchSize", requireText(source, "fetchSize"));
             data.put("splitSize", requireText(source, "splitSize"));
+
+            appendOptionalText(data, source, "server-id");
+            appendOptionalText(data, source, "serverIdMode");
 
             data.put("keyword",
                     tableMatch.path("keyword").asText(""));
