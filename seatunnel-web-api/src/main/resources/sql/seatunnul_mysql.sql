@@ -723,3 +723,45 @@ CREATE TABLE `QRTZ_TRIGGERS`
     PRIMARY KEY (`sched_name`, `trigger_name`, `trigger_group`) USING BTREE
 ) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci ROW_FORMAT = Dynamic;
 
+
+-- ----------------------------
+-- Table structure for t_seatunnel_web_cdc_server_id_pool
+-- ----------------------------
+DROP TABLE IF EXISTS `t_seatunnel_web_cdc_server_id_pool`;
+CREATE TABLE `t_seatunnel_web_cdc_server_id_pool`
+(
+    `id`            bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'primary key',
+    `datasource_id` bigint(20) NOT NULL COMMENT 'datasource id for this MySQL CDC server-id pool',
+    `instance_key`  varchar(255) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL COMMENT 'unique MySQL instance or cluster key',
+    `min_server_id` bigint(20) NOT NULL DEFAULT 5400 COMMENT 'minimum allocatable server-id',
+    `max_server_id` bigint(20) NOT NULL DEFAULT 6400 COMMENT 'maximum allocatable server-id',
+    `status`        tinyint(4) NOT NULL DEFAULT 1 COMMENT '1 enabled, 0 disabled',
+    `create_time`   datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0) COMMENT 'create time',
+    `update_time`   datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0) ON UPDATE CURRENT_TIMESTAMP(0) COMMENT 'update time',
+    PRIMARY KEY (`id`) USING BTREE,
+    UNIQUE KEY `uk_cdc_server_id_pool_instance` (`instance_key`) USING BTREE,
+    KEY `idx_cdc_server_id_pool_datasource` (`datasource_id`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci COMMENT = 'MySQL CDC server-id allocation pool' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Table structure for t_seatunnel_web_cdc_server_id_allocation
+-- ----------------------------
+DROP TABLE IF EXISTS `t_seatunnel_web_cdc_server_id_allocation`;
+CREATE TABLE `t_seatunnel_web_cdc_server_id_allocation`
+(
+    `id`                bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'primary key',
+    `pool_id`           bigint(20) NOT NULL COMMENT 'server-id pool id',
+    `server_id`         bigint(20) NOT NULL COMMENT 'allocated MySQL CDC server-id',
+    `job_definition_id` bigint(20) NOT NULL COMMENT 'job definition id',
+    `job_instance_id`   bigint(20) NULL DEFAULT NULL COMMENT 'job instance id',
+    `source`            varchar(32) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL DEFAULT 'MANUAL' COMMENT 'MANUAL or AUTO',
+    `active`            tinyint(4) NULL DEFAULT 1 COMMENT '1 currently occupied, NULL released',
+    `allocated_time`    datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0) COMMENT 'allocated time',
+    `released_time`     datetime(0) NULL DEFAULT NULL COMMENT 'released time',
+    `create_time`       datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0) COMMENT 'create time',
+    `update_time`       datetime(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0) ON UPDATE CURRENT_TIMESTAMP(0) COMMENT 'update time',
+    PRIMARY KEY (`id`) USING BTREE,
+    UNIQUE KEY `uk_cdc_server_id_active` (`pool_id`, `server_id`, `active`) USING BTREE,
+    KEY `idx_cdc_server_id_job_definition` (`job_definition_id`) USING BTREE,
+    KEY `idx_cdc_server_id_job_instance` (`job_instance_id`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8 COLLATE = utf8_general_ci COMMENT = 'MySQL CDC server-id allocation records' ROW_FORMAT = Dynamic;
