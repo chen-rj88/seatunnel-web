@@ -1,26 +1,21 @@
-import { ArrowLeftOutlined } from "@ant-design/icons";
-import { Button, Col, Form, message, Popover, Row, Space } from "antd";
-import {
-  Blocks,
-  Braces,
-  Database,
-  Eye,
-  Upload,
-} from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ReactFlowProvider } from "reactflow";
-import { seatunnelJobDefinitionApi } from "../api";
-import FlowCanvas from "./FlowCanvas";
-import RightConfigPanel from "./RightConfigPanel";
-import { CheckListPopover } from "./components/CheckListPopover";
-import {
+import { ArrowLeftOutlined } from '@ant-design/icons';
+import { Button, Col, Form, message, Popover, Row, Space } from 'antd';
+import { Blocks, Braces, Database, Eye, Upload } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ReactFlowProvider } from 'reactflow';
+import { seatunnelJobDefinitionApi } from '../api';
+import { validateServerIdRange } from '../config/serverId';
+import { CheckListPopover } from './components/CheckListPopover';
+import type {
   BasicConfig,
   EnvConfig,
-} from "./components/ScheduleConfigContent/types";
-import { useFlowChecks } from "./hooks/useFlowChecks";
-import "./index.less";
-import CodeBlockWithCopy from "./operator/CodeBlockWithCopy";
-import RunLog from "./run";
+} from './components/ScheduleConfigContent/types';
+import FlowCanvas from './FlowCanvas';
+import { useFlowChecks } from './hooks/useFlowChecks';
+import RightConfigPanel from './RightConfigPanel';
+import './index.less';
+import CodeBlockWithCopy from './operator/CodeBlockWithCopy';
+import RunLog from './run';
 
 interface WorkflowProps {
   params: any;
@@ -78,7 +73,7 @@ export default function Workflow({
 
   const [rightWidth, setRightWidth] = useState(540);
   const [activeTab, setActiveTab] = useState<
-    "basic" | "mapping" | "env" | null
+    'basic' | 'mapping' | 'env' | null
   >(null);
 
   const draggingRef = useRef(false);
@@ -89,7 +84,7 @@ export default function Workflow({
   }>(() => getInitialWorkflowGraph(params));
 
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewContent, setPreviewContent] = useState("");
+  const [previewContent, setPreviewContent] = useState('');
   const [previewLoading, setPreviewLoading] = useState(false);
 
   const [runVisible, setRunVisible] = useState(false);
@@ -99,7 +94,6 @@ export default function Workflow({
   >(params?.id);
 
   const [publishLoading, setPublishLoading] = useState(false);
-
 
   const currentSignature = useMemo(() => {
     return buildDirtySignature({
@@ -121,12 +115,31 @@ export default function Workflow({
    * current !== baseline
    * 所以 isDirty = true，需要重新发布。
    */
-  const [baselineSignature, setBaselineSignature] =
+  const [_baselineSignature, setBaselineSignature] =
     useState<string>(currentSignature);
-
 
   const { checkStat, checkGroups } = useFlowChecks(workflowGraph.nodes || []);
 
+  const validateServerIdBeforeAction = () => {
+    const sourceNode = (workflowGraph.nodes || []).find(
+      (node: any) => node?.data?.nodeType === 'source',
+    );
+    const sourceConfig = sourceNode?.data?.config || {};
+
+    if (sourceConfig.serverIdMode === 'AUTO') {
+      return true;
+    }
+
+    const result = validateServerIdRange(
+      sourceConfig.serverId || sourceConfig['server-id'],
+    );
+    if (!result.valid) {
+      message.warning(result.message);
+      return false;
+    }
+
+    return true;
+  };
 
   const validateChecklistBeforeAction = () => {
     const total =
@@ -136,7 +149,7 @@ export default function Workflow({
       0;
 
     if (total !== 0) {
-      message.warning("请先完成 Checklist 检查后，再进行预览或同步");
+      message.warning('请先完成 Checklist 检查后，再进行预览或同步');
       return false;
     }
 
@@ -156,16 +169,16 @@ export default function Workflow({
 
     const handleMouseUp = () => {
       draggingRef.current = false;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
 
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
     };
   }, []);
 
@@ -201,8 +214,8 @@ export default function Workflow({
 
   const handleResizeStart = () => {
     draggingRef.current = true;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
   };
 
   const buildWorkflowData = () => {
@@ -229,21 +242,20 @@ export default function Workflow({
 
   const handlePreview = async () => {
     try {
-      if (!validateChecklistBeforeAction()) {
+      if (!validateChecklistBeforeAction() || !validateServerIdBeforeAction()) {
         return;
       }
 
       setPreviewLoading(true);
 
       const finalPayload = buildFinalPayload();
-      const res = await seatunnelJobDefinitionApi.buildGuideSingleConfig(
-        finalPayload
-      );
+      const res =
+        await seatunnelJobDefinitionApi.buildGuideSingleConfig(finalPayload);
 
-      setPreviewContent(res?.data || "");
+      setPreviewContent(res?.data || '');
       setPreviewOpen(true);
     } catch (error: any) {
-      message.error(error?.message || "预览失败");
+      message.error(error?.message || '预览失败');
     } finally {
       setPreviewLoading(false);
     }
@@ -251,18 +263,18 @@ export default function Workflow({
 
   const handleSave = async () => {
     try {
-      if (!validateChecklistBeforeAction()) {
+      if (!validateChecklistBeforeAction() || !validateServerIdBeforeAction()) {
         return;
       }
 
       setPublishLoading(true);
 
       const finalPayload = buildFinalPayload();
-      const res = await seatunnelJobDefinitionApi.saveOrUpdateGuideSingle(
-        finalPayload
-      );
+      const res =
+        await seatunnelJobDefinitionApi.saveOrUpdateGuideSingle(finalPayload);
 
-      const jobDefineId = res?.data?.id ?? res?.data ?? finalPayload.id;
+      const responseData = res?.data as any;
+      const jobDefineId = responseData?.id ?? responseData ?? finalPayload.id;
 
       if (jobDefineId) {
         setPublishedJobDefineId(jobDefineId);
@@ -281,9 +293,8 @@ export default function Workflow({
         }));
       }
 
-      message.success("发布成功");
-    } catch (error: any) {
-      
+      message.success('发布成功');
+    } catch (_error: any) {
     } finally {
       setPublishLoading(false);
     }
@@ -313,7 +324,7 @@ export default function Workflow({
   };
 
   const actionChipClass =
-    "inline-flex h-[34px] cursor-pointer select-none items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-3.5 text-[13px] font-medium leading-none text-slate-500 transition-colors duration-200 hover:border-slate-300 hover:bg-white/80 hover:text-slate-700 hover:shadow-[0_4px_12px_rgba(15,23,42,0.05)] active:translate-y-0";
+    'inline-flex h-[34px] cursor-pointer select-none items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-3.5 text-[13px] font-medium leading-none text-slate-500 transition-colors duration-200 hover:border-slate-300 hover:bg-white/80 hover:text-slate-700 hover:shadow-[0_4px_12px_rgba(15,23,42,0.05)] active:translate-y-0';
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-white">
@@ -380,19 +391,18 @@ export default function Workflow({
                         </div>
                       }
                     >
-                      <div
+                      <button
+                        type="button"
                         className={actionChipClass}
                         onClick={handlePreview}
-                        role="button"
-                        tabIndex={0}
                       >
                         <Eye
                           size={15}
                           strokeWidth={1.9}
-                          className={previewLoading ? "animate-spin" : ""}
+                          className={previewLoading ? 'animate-spin' : ''}
                         />
                         <span className="ml-1">预览</span>
-                      </div>
+                      </button>
                     </Popover>
 
                     <Button
@@ -408,7 +418,7 @@ export default function Workflow({
                 </div>
 
                 <div className="min-h-0 flex-1 bg-white p-[18px] [background:radial-gradient(circle_at_top_left,rgba(78,116,248,0.04),transparent_22%),#ffffff]">
-                  <Row gutter={24} style={{ height: "100%" }}>
+                  <Row gutter={24} style={{ height: '100%' }}>
                     <Col span={4}>
                       <div className="flex h-full flex-col gap-3 overflow-auto border-r border-slate-100 p-3">
                         <div className="px-0.5 pb-2 pt-1 text-[13px] font-semibold text-slate-700">
@@ -420,15 +430,15 @@ export default function Workflow({
                           draggable
                           onDragStart={(event) => {
                             event.dataTransfer.setData(
-                              "application/reactflow",
+                              'application/reactflow',
                               JSON.stringify({
-                                nodeType: "transform",
-                                componentType: "FIELDMAPPER",
-                                iconType: "braces",
-                                label: "字段映射",
-                              })
+                                nodeType: 'transform',
+                                componentType: 'FIELDMAPPER',
+                                iconType: 'braces',
+                                label: '字段映射',
+                              }),
                             );
-                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.effectAllowed = 'move';
                           }}
                         >
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-indigo-50 to-indigo-100 text-indigo-600">
@@ -450,15 +460,15 @@ export default function Workflow({
                           draggable
                           onDragStart={(event) => {
                             event.dataTransfer.setData(
-                              "application/reactflow",
+                              'application/reactflow',
                               JSON.stringify({
-                                nodeType: "transform",
-                                componentType: "SQL",
-                                iconType: "database",
-                                label: "SQL 脚本",
-                              })
+                                nodeType: 'transform',
+                                componentType: 'SQL',
+                                iconType: 'database',
+                                label: 'SQL 脚本',
+                              }),
                             );
-                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.effectAllowed = 'move';
                           }}
                         >
                           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-b from-violet-50 to-violet-100 text-violet-600">
@@ -506,12 +516,15 @@ export default function Workflow({
             </div>
 
             {activeTab && (
+              // biome-ignore lint/a11y/useSemanticElements: resize handle needs custom drag content
               <div
                 className="relative flex w-[20px] shrink-0 cursor-col-resize items-center justify-center bg-transparent transition-colors duration-100 hover:bg-[rgba(49,94,251,0.04)]"
                 onMouseDown={handleResizeStart}
                 role="separator"
                 aria-orientation="vertical"
                 aria-label="调整左右面板宽度"
+                aria-valuenow={rightWidth}
+                tabIndex={0}
               >
                 <div className="h-full w-px bg-slate-200 transition-colors duration-100" />
                 <div className="absolute left-1/2 top-1/2 flex h-[46px] w-5 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1 rounded-full border border-slate-200 bg-white opacity-90 shadow-sm transition-all duration-200 hover:scale-100 hover:opacity-100 hover:shadow-[0_10px_28px_rgba(15,23,42,0.1)]">

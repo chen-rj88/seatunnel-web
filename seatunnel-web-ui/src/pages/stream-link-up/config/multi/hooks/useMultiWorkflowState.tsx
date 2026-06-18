@@ -8,6 +8,10 @@ import {
 } from '@/pages/data-source/service';
 
 import { seatunnelStremJobDefinitionApi } from '@/pages/stream-link-up/api';
+
+import { validateServerIdRange } from '../../serverId';
+
+
 import {
   buildTableItems,
   DEFAULT_DB_TYPE,
@@ -522,7 +526,8 @@ export function useMultiWorkflowState({
           finalPayload,
         );
 
-      const jobDefineId = res?.data?.id ?? res?.data ?? finalPayload.id;
+      const responseData = res?.data as any;
+      const jobDefineId = responseData?.id ?? responseData ?? finalPayload.id;
 
       if (jobDefineId) {
         setPublishedJobDefineId(jobDefineId);
