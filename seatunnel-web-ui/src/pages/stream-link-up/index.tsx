@@ -664,7 +664,7 @@ const RealtimeSyncPage: React.FC = () => {
           />
         </div>
 
-        {!loading && dataSource.length <= 1 ? (
+        {dataSource.length <= 1 ? (
           <>
             <Divider style={{ padding: 0, margin: "12px 0" }} />
             <StreamingHelperSection />

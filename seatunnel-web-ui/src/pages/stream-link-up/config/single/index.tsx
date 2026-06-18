@@ -118,6 +118,8 @@ export default function SingleConfigPage() {
         return;
       }
 
+      console.log(cache);
+
       const data = JSON.parse(cache);
 
       setParams(data);

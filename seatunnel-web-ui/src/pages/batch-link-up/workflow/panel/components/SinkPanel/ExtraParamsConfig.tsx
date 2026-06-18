@@ -62,7 +62,7 @@ const ExtraParamsConfig: FC<ExtraParamsConfigProps> = ({
         const res = await fetchConnectorParamOptions({
           type: DEFAULT_PARAM_TYPE,
           connectorName,
-          connectorType,
+          connectorType: "sink",
         });
 
         if (ignore) {
