@@ -7,6 +7,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.web.api.service.BatchJobDefinitionService;
 import org.apache.seatunnel.web.api.service.BatchJobInstanceService;
 import org.apache.seatunnel.web.api.service.JobScheduleService;
+import org.apache.seatunnel.web.api.service.cdc.CdcServerIdAllocationService;
 import org.apache.seatunnel.web.api.service.application.JobScheduleApplicationService;
 import org.apache.seatunnel.web.common.enums.ReleaseState;
 import org.apache.seatunnel.web.common.utils.JSONUtils;
@@ -64,6 +65,9 @@ public class BatchJobDefinitionServiceImpl extends BaseServiceImpl implements Ba
     @Resource
     private JobScheduleService jobScheduleService;
 
+    @Resource
+    private CdcServerIdAllocationService cdcServerIdAllocationService;
+
     /**
      * Save or update batch job definition.
      */
@@ -76,8 +80,6 @@ public class BatchJobDefinitionServiceImpl extends BaseServiceImpl implements Ba
 
             JobDefinitionModeHandler handler = getAndValidateHandler(command);
             JobDefinitionAnalysisResult analysis = handler.analyze(command);
-            String definitionContent = handler.serializeDefinition(command);
-
             JobDefinitionEntity existing = command.getId() == null
                     ? null
                     : jobDefinitionDao.queryById(command.getId());
@@ -95,6 +97,9 @@ public class BatchJobDefinitionServiceImpl extends BaseServiceImpl implements Ba
             }
 
             jobDefinitionDao.saveOrUpdate(entity);
+
+            cdcServerIdAllocationService.prepare(command, entity.getId());
+            String definitionContent = handler.serializeDefinition(command);
 
             JobDefinitionContentEntity contentEntity = JobDefinitionContentEntity.builder()
                     .jobDefinitionId(entity.getId())
@@ -204,6 +209,7 @@ public class BatchJobDefinitionServiceImpl extends BaseServiceImpl implements Ba
         validateDelete(definition.getId());
 
         try {
+            cdcServerIdAllocationService.release(jobDefinitionId);
             scheduleApplicationService.removeSchedule(jobDefinitionId);
             jobInstanceService.removeAllByDefinitionId(jobDefinitionId);
             jobDefinitionContentDao.deleteByJobDefinitionId(jobDefinitionId);

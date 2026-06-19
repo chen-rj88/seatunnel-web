@@ -1,5 +1,6 @@
 package org.apache.seatunnel.web.spi.bean.dto.config;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.util.List;
@@ -30,6 +31,9 @@ public class GuideMultiJobContent {
         private String pluginName;
         private Integer fetchSize;
         private Integer splitSize;
+        private String serverIdMode;
+        @JsonProperty("server-id")
+        private String serverId;
     }
 
     @Data
