@@ -185,6 +185,9 @@ function SourcePanel({
                     size="small"
                     type="text"
                     icon={<Eye size={14} />}
+                    style={{
+                      fontSize: 13,
+                    }}
                     onClick={handlePreview}
                     loading={viewLoading}
                   >
@@ -192,11 +195,17 @@ function SourcePanel({
                   </Button>
                 </Tooltip>
 
-                <Divider type="vertical" />
+                <Divider
+                  type="vertical"
+                  style={{ padding: 0, margin: "0 4px" }}
+                />
 
                 <Tooltip title="解析字段">
                   <Button
                     size="small"
+                    style={{
+                      fontSize: 13,
+                    }}
                     type="text"
                     icon={<BarChart3 size={14} />}
                     onClick={handleResolveColumns}
