@@ -58,7 +58,7 @@ export const buildTableItems = (list: any[] = []): TableItem[] => {
     };
   });
 };
-}
+
 export const SERVER_ID_PATTERN = /^(?:[1-9]\d*)(?:-(?:[1-9]\d*))?$/;
 
 export const validateServerIdRange = (value?: string) => {

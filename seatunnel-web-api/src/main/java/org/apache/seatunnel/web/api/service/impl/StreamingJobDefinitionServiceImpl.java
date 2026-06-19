@@ -100,7 +100,7 @@ public class StreamingJobDefinitionServiceImpl extends BaseServiceImpl implement
             throw e;
         } catch (Exception e) {
             log.error("Save or update streaming job definition failed, command={}", command, e);
-            throw new ServiceException(Status.SAVE_OR_UPDATE_BATCH_JOB_DEFINITION_ERROR);
+            throw new ServiceException(e.getMessage());
         }
     }
 
