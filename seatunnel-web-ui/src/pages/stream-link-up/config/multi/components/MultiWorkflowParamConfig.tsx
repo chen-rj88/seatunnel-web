@@ -2,7 +2,6 @@
 import { Col, Form, InputNumber, Row, Select, Switch } from 'antd';
 import React from 'react';
 import CdcServerIdConfig from '../../components/CdcServerIdConfig';
-
 import {
   Alert,
   Col,
@@ -14,14 +13,12 @@ import {
   Select,
   Switch,
 } from 'antd';
-import React from 'react';
+
 import {
   DATA_SAVE_MODE_OPTIONS,
   FIELD_IDE_OPTIONS,
   SCHEMA_SAVE_MODE_OPTIONS,
-
   validateServerIdRange,
-
 } from '../config';
 
 const MultiWorkflowParamConfig: React.FC = () => {
@@ -30,8 +27,6 @@ const MultiWorkflowParamConfig: React.FC = () => {
       <div className="mb-5 text-base font-semibold text-slate-800">
         参数设置
       </div>
-
-
       <CdcServerIdConfig />
 
       <div className="mb-5 rounded-2xl border border-slate-100 bg-slate-50/60 p-4">

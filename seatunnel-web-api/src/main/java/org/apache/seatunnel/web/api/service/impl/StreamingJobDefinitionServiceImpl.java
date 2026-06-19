@@ -8,6 +8,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.web.api.service.StreamingJobDefinitionService;
 import org.apache.seatunnel.web.api.service.StreamingJobInstanceService;
 import org.apache.seatunnel.web.api.service.StreamingJobMetricsService;
+import org.apache.seatunnel.web.api.service.cdc.CdcServerIdAllocationService;
 import org.apache.seatunnel.web.common.enums.ReleaseState;
 import org.apache.seatunnel.web.common.utils.JSONUtils;
 import org.apache.seatunnel.web.core.exceptions.ServiceException;
@@ -58,6 +59,9 @@ public class StreamingJobDefinitionServiceImpl extends BaseServiceImpl implement
     private StreamingJobDefinitionQueryService definitionQueryService;
 
     @Resource
+    private CdcServerIdAllocationService cdcServerIdAllocationService;
+
+    @Resource
     private StreamingJobInstanceService streamingJobInstanceService;
 
     @Resource
@@ -87,6 +91,8 @@ public class StreamingJobDefinitionServiceImpl extends BaseServiceImpl implement
             SaveContext context = prepareSaveContext(command);
 
             StreamingJobDefinitionEntity entity = saveDefinition(command, context);
+            cdcServerIdAllocationService.prepare(command, entity.getId());
+            context.setDefinitionContent(context.getHandler().serializeDefinition(command));
             saveDefinitionContent(command, context, entity);
 
             return entity.getId();
@@ -207,6 +213,7 @@ public class StreamingJobDefinitionServiceImpl extends BaseServiceImpl implement
         validateDelete(definition.getId());
 
         try {
+            cdcServerIdAllocationService.release(jobDefinitionId);
             streamingJobInstanceService.removeAllByDefinitionId(jobDefinitionId);
             streamingJobDefinitionContentDao.deleteByJobDefinitionId(jobDefinitionId);
 

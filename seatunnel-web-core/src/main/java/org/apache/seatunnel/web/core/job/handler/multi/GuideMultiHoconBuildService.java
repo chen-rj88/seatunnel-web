@@ -117,6 +117,9 @@ public class GuideMultiHoconBuildService {
             config.put("splitSize", source.getSplitSize());
         }
 
+        putIfNotBlank(config, "server-id", source.getServerId());
+        putIfNotBlank(config, "serverIdMode", source.getServerIdMode());
+
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("nodeType", NODE_TYPE_SOURCE);
         data.put("title", defaultIfBlank(source.getDbType(), "Source"));
