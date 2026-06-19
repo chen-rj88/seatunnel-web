@@ -57,6 +57,7 @@ export const buildTableItems = (list: any[] = []): TableItem[] => {
       rawTitle: String(tableName).toLowerCase(),
     };
   });
+};
 }
 export const SERVER_ID_PATTERN = /^(?:[1-9]\d*)(?:-(?:[1-9]\d*))?$/;
 
