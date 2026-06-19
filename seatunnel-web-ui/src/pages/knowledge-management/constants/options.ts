@@ -17,8 +17,4 @@ export const timeFormatOptions = [
 export const connectorNameOptions = [
   { label: "Jdbc", value: "Jdbc" },
   { label: "MySQL-CDC", value: "MySQL-CDC" },
-  { label: "ClickHouse", value: "ClickHouse" },
-  { label: "Hive", value: "Hive" },
-  { label: "Doris", value: "Doris" },
-  { label: "Kafka", value: "Kafka" },
 ];
