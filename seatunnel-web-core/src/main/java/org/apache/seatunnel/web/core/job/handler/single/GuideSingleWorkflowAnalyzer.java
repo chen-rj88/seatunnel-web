@@ -1,18 +1,24 @@
 package org.apache.seatunnel.web.core.job.handler.single;
 
+import org.apache.seatunnel.web.common.enums.JobDefinitionMode;
+import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisContext;
+import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisResult;
+import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisRole;
+import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceJobDefinitionAnalyzerRegistry;
 import org.apache.seatunnel.web.core.job.model.JobDefinitionAnalysisResult;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Component
 public class GuideSingleWorkflowAnalyzer {
 
-    private static final Pattern FROM_TABLE_PATTERN = Pattern.compile(
-            "(?i)\\bfrom\\s+([`\"]?[\\w.]+[`\"]?)"
-    );
+    private final DatasourceJobDefinitionAnalyzerRegistry datasourceAnalyzerRegistry;
+
+    public GuideSingleWorkflowAnalyzer(DatasourceJobDefinitionAnalyzerRegistry datasourceAnalyzerRegistry) {
+        this.datasourceAnalyzerRegistry = datasourceAnalyzerRegistry;
+    }
 
     public JobDefinitionAnalysisResult analyze(Object workflowObj) {
         Map<String, Object> workflow = WorkflowNodeHelper.safeMap(workflowObj);
@@ -20,172 +26,38 @@ public class GuideSingleWorkflowAnalyzer {
         Map<String, Object> sourceNode = WorkflowNodeHelper.findFirstNodeByType(workflow, "source");
         Map<String, Object> sinkNode = WorkflowNodeHelper.findFirstNodeByType(workflow, "sink");
 
+        DatasourceAnalysisResult sourceAnalysis = datasourceAnalyzerRegistry.analyze(
+                buildContext(DatasourceAnalysisRole.SOURCE, sourceNode, workflowObj)
+        );
+        DatasourceAnalysisResult sinkAnalysis = datasourceAnalyzerRegistry.analyze(
+                buildContext(DatasourceAnalysisRole.SINK, sinkNode, workflowObj)
+        );
+
         return JobDefinitionAnalysisResult.builder()
-                .sourceType(extractNodeDbType(sourceNode))
-                .sinkType(extractNodeDbType(sinkNode))
-                .sourceDatasourceId(extractDatasourceId(sourceNode))
-                .sinkDatasourceId(extractDatasourceId(sinkNode))
-                .sourceTable(extractSourceTable(sourceNode))
-                .sinkTable(extractSinkTable(sinkNode))
+                .sourceType(sourceAnalysis.getType())
+                .sinkType(sinkAnalysis.getType())
+                .sourceDatasourceId(sourceAnalysis.getDatasourceId())
+                .sinkDatasourceId(sinkAnalysis.getDatasourceId())
+                .sourceTable(firstObject(sourceAnalysis.getObjects()))
+                .sinkTable(firstObject(sinkAnalysis.getObjects()))
                 .build();
     }
 
-    private String extractNodeDbType(Map<String, Object> node) {
-        if (node == null || node.isEmpty()) {
+    private DatasourceAnalysisContext buildContext(DatasourceAnalysisRole role,
+                                                   Map<String, Object> node,
+                                                   Object workflowObj) {
+        return DatasourceAnalysisContext.builder()
+                .mode(JobDefinitionMode.GUIDE_SINGLE)
+                .role(role)
+                .workflowNode(node)
+                .rawContent(workflowObj)
+                .build();
+    }
+
+    private String firstObject(List<String> objects) {
+        if (objects == null || objects.isEmpty()) {
             return "";
         }
-
-        Map<String, Object> data = WorkflowNodeHelper.safeMap(node.get("data"));
-        Map<String, Object> config = WorkflowNodeHelper.safeMap(data.get("config"));
-
-        String dbType = WorkflowNodeHelper.getString(data, "dbType");
-        if (!dbType.isEmpty()) {
-            return dbType;
-        }
-
-        return WorkflowNodeHelper.getString(config, "dbType");
-    }
-
-    private Long extractDatasourceId(Map<String, Object> node) {
-        if (node == null || node.isEmpty()) {
-            return null;
-        }
-
-        Map<String, Object> data = WorkflowNodeHelper.safeMap(node.get("data"));
-        Map<String, Object> config = WorkflowNodeHelper.safeMap(data.get("config"));
-
-        Object rawDatasourceId = firstNonNull(
-                config.get("dataSourceId")
-        );
-
-        return parseLong(rawDatasourceId);
-    }
-
-    private Object firstNonNull(Object... values) {
-        if (values == null) {
-            return null;
-        }
-
-        for (Object value : values) {
-            if (value != null) {
-                return value;
-            }
-        }
-
-        return null;
-    }
-
-    private Long parseLong(Object value) {
-        if (value == null) {
-            return null;
-        }
-
-        if (value instanceof Number) {
-            return ((Number) value).longValue();
-        }
-
-        String text = WorkflowNodeHelper.safeTrim(String.valueOf(value));
-        if (text.isEmpty()) {
-            return null;
-        }
-
-        try {
-            return Long.parseLong(text);
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
-    private String extractSourceTable(Map<String, Object> sourceNode) {
-        if (sourceNode == null || sourceNode.isEmpty()) {
-            return "";
-        }
-
-        Map<String, Object> data = WorkflowNodeHelper.safeMap(sourceNode.get("data"));
-        Map<String, Object> config = WorkflowNodeHelper.safeMap(data.get("config"));
-
-        String sourceTable = WorkflowNodeHelper.firstNonBlank(
-                WorkflowNodeHelper.getString(data, "sourceTable"),
-                WorkflowNodeHelper.getString(config, "sourceTable"),
-                WorkflowNodeHelper.getString(data, "table"),
-                WorkflowNodeHelper.getString(config, "table"),
-                WorkflowNodeHelper.getString(data, "sourceTableName"),
-                WorkflowNodeHelper.getString(config, "sourceTableName")
-        );
-        if (!sourceTable.isEmpty()) {
-            return sourceTable;
-        }
-
-        String sql = WorkflowNodeHelper.firstNonBlank(
-                WorkflowNodeHelper.getString(config, "sql"),
-                WorkflowNodeHelper.getString(data, "sql")
-        );
-        return parseTableFromSql(sql);
-    }
-
-    private String extractSinkTable(Map<String, Object> sinkNode) {
-        if (sinkNode == null || sinkNode.isEmpty()) {
-            return "";
-        }
-
-        Map<String, Object> data = WorkflowNodeHelper.safeMap(sinkNode.get("data"));
-        Map<String, Object> config = WorkflowNodeHelper.safeMap(data.get("config"));
-
-        String sinkTable = WorkflowNodeHelper.firstNonBlank(
-                WorkflowNodeHelper.getString(data, "sinkTableName"),
-                WorkflowNodeHelper.getString(config, "sinkTableName"),
-                WorkflowNodeHelper.getString(data, "targetTableName"),
-                WorkflowNodeHelper.getString(config, "targetTableName"),
-                WorkflowNodeHelper.getString(data, "table"),
-                WorkflowNodeHelper.getString(config, "table"),
-                WorkflowNodeHelper.getString(data, "targetTable"),
-                WorkflowNodeHelper.getString(config, "targetTable")
-        );
-        if (!sinkTable.isEmpty()) {
-            return sinkTable;
-        }
-
-        String sinkSql = WorkflowNodeHelper.firstNonBlank(
-                WorkflowNodeHelper.getString(data, "sinkSql"),
-                WorkflowNodeHelper.getString(config, "sinkSql"),
-                WorkflowNodeHelper.getString(data, "sql"),
-                WorkflowNodeHelper.getString(config, "sql")
-        );
-        return parseTableFromSql(sinkSql);
-    }
-
-    private String parseTableFromSql(String sql) {
-        if (sql == null || sql.trim().isEmpty()) {
-            return "";
-        }
-
-        try {
-            String normalizedSql = sql
-                    .replaceAll("[\\r\\n\\t]+", " ")
-                    .replaceAll("\\s+", " ")
-                    .trim();
-
-            Matcher matcher = FROM_TABLE_PATTERN.matcher(normalizedSql);
-            if (matcher.find()) {
-                return cleanIdentifier(matcher.group(1));
-            }
-        } catch (Exception ignored) {
-        }
-
-        return "";
-    }
-
-    private String cleanIdentifier(String value) {
-        String result = WorkflowNodeHelper.safeTrim(value);
-        if (result.isEmpty()) {
-            return "";
-        }
-
-        if ((result.startsWith("`") && result.endsWith("`"))
-                || (result.startsWith("\"") && result.endsWith("\""))) {
-            result = result.substring(1, result.length() - 1);
-        }
-
-        return result.trim();
+        return objects.get(0);
     }
 }
