@@ -1,7 +1,7 @@
 package org.apache.seatunnel.web.core.job.assembler;
 
 import org.apache.seatunnel.web.common.enums.ReleaseState;
-import org.apache.seatunnel.web.core.job.model.JobDefinitionAnalysisResult;
+import org.apache.seatunnel.web.common.modal.JobDefinitionAnalysisResult;
 import org.apache.seatunnel.web.dao.entity.StreamingJobDefinitionEntity;
 import org.apache.seatunnel.web.spi.bean.dto.command.JobDefinitionSaveCommand;
 import org.apache.seatunnel.web.spi.bean.dto.config.JobBasicConfig;

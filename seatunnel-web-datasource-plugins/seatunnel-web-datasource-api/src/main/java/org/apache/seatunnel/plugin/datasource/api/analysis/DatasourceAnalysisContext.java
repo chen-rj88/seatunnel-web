@@ -4,6 +4,7 @@ import com.typesafe.config.Config;
 import lombok.Builder;
 import lombok.Data;
 import org.apache.seatunnel.web.common.enums.JobDefinitionMode;
+import org.apache.seatunnel.web.spi.enums.DbType;
 
 import java.util.Map;
 
@@ -17,7 +18,7 @@ public class DatasourceAnalysisContext {
 
     private String pluginName;
 
-    private String dbType;
+    private DbType dbType;
 
     private Long datasourceId;
 

@@ -1,43 +1,75 @@
 package org.apache.seatunnel.plugin.datasource.api.analysis;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.ServiceLoader;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.seatunnel.web.common.modal.JobDefinitionAnalysisResult;
+import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+
+@Component
 public class DatasourceJobDefinitionAnalyzerRegistry {
 
-    private final List<DatasourceJobDefinitionAnalyzer> analyzers;
+    private final Map<String, DatasourceJobDefinitionAnalyzer> analyzerMap;
     private final DefaultDatasourceJobDefinitionAnalyzer defaultAnalyzer;
 
-    public DatasourceJobDefinitionAnalyzerRegistry() {
-        this(new DefaultDatasourceJobDefinitionAnalyzer());
-    }
+    public DatasourceJobDefinitionAnalyzerRegistry(
+            List<DatasourceJobDefinitionAnalyzer> analyzers,
+            DefaultDatasourceJobDefinitionAnalyzer defaultAnalyzer) {
 
-    public DatasourceJobDefinitionAnalyzerRegistry(DefaultDatasourceJobDefinitionAnalyzer defaultAnalyzer) {
-        this(loadAnalyzers(), defaultAnalyzer);
-    }
-
-    public DatasourceJobDefinitionAnalyzerRegistry(List<DatasourceJobDefinitionAnalyzer> analyzers,
-                                                   DefaultDatasourceJobDefinitionAnalyzer defaultAnalyzer) {
-        this.analyzers = analyzers;
         this.defaultAnalyzer = defaultAnalyzer;
+
+        this.analyzerMap = analyzers.stream()
+                .filter(analyzer -> !(analyzer instanceof DefaultDatasourceJobDefinitionAnalyzer))
+                .filter(analyzer -> StringUtils.isNotBlank(analyzer.type()))
+                .collect(Collectors.toMap(
+                        analyzer -> normalize(analyzer.type()),
+                        Function.identity(),
+                        (oldValue, newValue) -> newValue,
+                        LinkedHashMap::new
+                ));
     }
 
-    public DatasourceAnalysisResult analyze(DatasourceAnalysisContext context) {
-        for (DatasourceJobDefinitionAnalyzer analyzer : analyzers) {
-            if (analyzer != defaultAnalyzer && analyzer.supports(context)) {
-                return analyzer.analyze(context);
+    public JobDefinitionAnalysisResult analyze(DatasourceAnalysisContext context) {
+        String analyzerKey = resolveAnalyzerKey(context);
+
+        DatasourceJobDefinitionAnalyzer analyzer = analyzerMap.get(normalize(analyzerKey));
+        if (analyzer != null && analyzer.supports(context)) {
+            return analyzer.analyze(context);
+        }
+
+        for (DatasourceJobDefinitionAnalyzer item : analyzerMap.values()) {
+            if (item.supports(context)) {
+                return item.analyze(context);
             }
         }
+
         return defaultAnalyzer.analyze(context);
     }
 
-    private static List<DatasourceJobDefinitionAnalyzer> loadAnalyzers() {
-        List<DatasourceJobDefinitionAnalyzer> result = new ArrayList<>();
-        ServiceLoader<DatasourceJobDefinitionAnalyzer> loader = ServiceLoader.load(DatasourceJobDefinitionAnalyzer.class);
-        for (DatasourceJobDefinitionAnalyzer analyzer : loader) {
-            result.add(analyzer);
+    private String resolveAnalyzerKey(DatasourceAnalysisContext context) {
+        if (context == null) {
+            return "";
         }
-        return result;
+
+        if (StringUtils.isNotBlank(context.getPluginName())) {
+            return context.getPluginName();
+        }
+
+        if (context.getDbType() != null) {
+            return context.getDbType().toString();
+        }
+
+        return "";
+    }
+
+    private String normalize(String value) {
+        return StringUtils.trimToEmpty(value)
+                .replace("-", "_")
+                .toUpperCase(Locale.ROOT);
     }
 }
