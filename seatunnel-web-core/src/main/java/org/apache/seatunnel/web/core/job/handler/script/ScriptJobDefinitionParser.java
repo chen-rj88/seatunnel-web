@@ -5,7 +5,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.plugin.datasource.api.utils.DataSourceUtils;
+import org.apache.seatunnel.web.common.enums.JobDefinitionMode;
 import org.apache.seatunnel.web.common.utils.JSONUtils;
+import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisContext;
+import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisResult;
+import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisRole;
+import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceJobDefinitionAnalyzerRegistry;
 import org.apache.seatunnel.web.core.job.model.JobDefinitionAnalysisResult;
 import org.apache.seatunnel.web.spi.enums.DbType;
 import org.springframework.stereotype.Component;
@@ -17,6 +22,12 @@ import java.util.regex.Pattern;
 @Slf4j
 @Component
 public class ScriptJobDefinitionParser {
+
+    private final DatasourceJobDefinitionAnalyzerRegistry datasourceAnalyzerRegistry;
+
+    public ScriptJobDefinitionParser(DatasourceJobDefinitionAnalyzerRegistry datasourceAnalyzerRegistry) {
+        this.datasourceAnalyzerRegistry = datasourceAnalyzerRegistry;
+    }
 
     private static final Pattern FROM_TABLE_PATTERN = Pattern.compile(
             "(?i)\\bfrom\\s+([`\"\\[]?[a-zA-Z0-9_.$-]+[`\"\\]]?)"
@@ -60,13 +71,19 @@ public class ScriptJobDefinitionParser {
         Set<String> sinkTables = new LinkedHashSet<>();
 
         for (PluginConfig plugin : sourcePlugins) {
-            sourceTypes.add(resolveDisplayPluginType(plugin.getPluginName(), plugin.getConfig()));
-            sourceTables.addAll(extractSourceTables(plugin.getConfig()));
+            DatasourceAnalysisResult result = datasourceAnalyzerRegistry.analyze(
+                    buildContext(DatasourceAnalysisRole.SOURCE, plugin)
+            );
+            sourceTypes.add(result.getType());
+            sourceTables.addAll(result.getObjects());
         }
 
         for (PluginConfig plugin : sinkPlugins) {
-            sinkTypes.add(resolveDisplayPluginType(plugin.getPluginName(), plugin.getConfig()));
-            sinkTables.addAll(extractSinkTables(plugin.getConfig()));
+            DatasourceAnalysisResult result = datasourceAnalyzerRegistry.analyze(
+                    buildContext(DatasourceAnalysisRole.SINK, plugin)
+            );
+            sinkTypes.add(result.getType());
+            sinkTables.addAll(result.getObjects());
         }
 
         return JobDefinitionAnalysisResult.builder()
@@ -74,6 +91,16 @@ public class ScriptJobDefinitionParser {
                 .sinkType(joinAsCsv(sinkTypes))
                 .sourceTable(JSONUtils.toJsonString(new ArrayList<>(sourceTables)))
                 .sinkTable(JSONUtils.toJsonString(new ArrayList<>(sinkTables)))
+                .build();
+    }
+
+
+    private DatasourceAnalysisContext buildContext(DatasourceAnalysisRole role, PluginConfig plugin) {
+        return DatasourceAnalysisContext.builder()
+                .mode(JobDefinitionMode.SCRIPT)
+                .role(role)
+                .pluginName(plugin.getPluginName())
+                .pluginConfig(plugin.getConfig())
                 .build();
     }
 
