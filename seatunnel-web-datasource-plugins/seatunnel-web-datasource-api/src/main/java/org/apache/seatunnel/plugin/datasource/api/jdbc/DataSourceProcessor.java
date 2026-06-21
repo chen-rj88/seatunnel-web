@@ -1,5 +1,6 @@
 package org.apache.seatunnel.plugin.datasource.api.jdbc;
 
+import org.apache.seatunnel.plugin.datasource.api.analysis.JobDefinitionAnalyzer;
 import org.apache.seatunnel.web.common.config.OptionRule;
 import org.apache.seatunnel.plugin.datasource.api.form.ReflectionFormGenerator;
 import org.apache.seatunnel.plugin.datasource.api.hocon.DataSourceHoconBuilder;
@@ -55,6 +56,14 @@ public interface DataSourceProcessor {
      * Allows each thread to obtain an isolated copy.
      */
     DataSourceProcessor create();
+
+    /**
+     * Job definition analyzer for this datasource processor.
+     *
+     * Used to extract datasource id, datasource type and table information
+     * from source/sink job definition.
+     */
+    JobDefinitionAnalyzer getJobDefinitionAnalyzer();
 
     default List<FormFieldConfig> generateFormFields() {
 

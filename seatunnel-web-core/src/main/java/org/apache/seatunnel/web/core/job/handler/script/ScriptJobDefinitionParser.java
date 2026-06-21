@@ -1,45 +1,32 @@
 package org.apache.seatunnel.web.core.job.handler.script;
 
-import com.typesafe.config.*;
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigException;
+import com.typesafe.config.ConfigFactory;
+import com.typesafe.config.ConfigValue;
+import com.typesafe.config.ConfigValueType;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisContext;
+import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisRole;
+import org.apache.seatunnel.plugin.datasource.api.analysis.JobDefinitionAnalyzer;
+import org.apache.seatunnel.plugin.datasource.api.jdbc.DataSourceProcessor;
 import org.apache.seatunnel.plugin.datasource.api.utils.DataSourceUtils;
 import org.apache.seatunnel.web.common.enums.JobDefinitionMode;
+import org.apache.seatunnel.web.common.modal.JobDefinitionAnalysisResult;
 import org.apache.seatunnel.web.common.utils.JSONUtils;
-import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisContext;
-import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisResult;
-import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisRole;
-import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceJobDefinitionAnalyzerRegistry;
-import org.apache.seatunnel.web.core.job.model.JobDefinitionAnalysisResult;
 import org.apache.seatunnel.web.spi.enums.DbType;
 import org.springframework.stereotype.Component;
 
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Component
 public class ScriptJobDefinitionParser {
-
-    private final DatasourceJobDefinitionAnalyzerRegistry datasourceAnalyzerRegistry;
-
-    public ScriptJobDefinitionParser(DatasourceJobDefinitionAnalyzerRegistry datasourceAnalyzerRegistry) {
-        this.datasourceAnalyzerRegistry = datasourceAnalyzerRegistry;
-    }
-
-    private static final Pattern FROM_TABLE_PATTERN = Pattern.compile(
-            "(?i)\\bfrom\\s+([`\"\\[]?[a-zA-Z0-9_.$-]+[`\"\\]]?)"
-    );
-
-    private static final Pattern INTO_TABLE_PATTERN = Pattern.compile(
-            "(?i)\\binto\\s+([`\"\\[]?[a-zA-Z0-9_.$-]+[`\"\\]]?)"
-    );
-
-    private static final Pattern UPDATE_TABLE_PATTERN = Pattern.compile(
-            "(?i)\\bupdate\\s+([`\"\\[]?[a-zA-Z0-9_.$-]+[`\"\\]]?)"
-    );
 
     public Config parseAndValidate(String hoconContent) {
         if (StringUtils.isBlank(hoconContent)) {
@@ -67,96 +54,154 @@ public class ScriptJobDefinitionParser {
 
         Set<String> sourceTypes = new LinkedHashSet<>();
         Set<String> sinkTypes = new LinkedHashSet<>();
+        Set<Long> sourceDatasourceIds = new LinkedHashSet<>();
+        Set<Long> sinkDatasourceIds = new LinkedHashSet<>();
         Set<String> sourceTables = new LinkedHashSet<>();
         Set<String> sinkTables = new LinkedHashSet<>();
 
         for (PluginConfig plugin : sourcePlugins) {
-            DatasourceAnalysisResult result = datasourceAnalyzerRegistry.analyze(
-                    buildContext(DatasourceAnalysisRole.SOURCE, plugin)
+            JobDefinitionAnalysisResult result = analyzePlugin(
+                    DatasourceAnalysisRole.SOURCE,
+                    plugin,
+                    hoconContent
             );
-            sourceTypes.add(result.getType());
-            sourceTables.addAll(result.getObjects());
+
+            addIfNotBlank(sourceTypes, result.getSourceType());
+            addIfNotNull(sourceDatasourceIds, result.getSourceDatasourceId());
+            addTableValues(sourceTables, result.getSourceTable());
         }
 
         for (PluginConfig plugin : sinkPlugins) {
-            DatasourceAnalysisResult result = datasourceAnalyzerRegistry.analyze(
-                    buildContext(DatasourceAnalysisRole.SINK, plugin)
+            JobDefinitionAnalysisResult result = analyzePlugin(
+                    DatasourceAnalysisRole.SINK,
+                    plugin,
+                    hoconContent
             );
-            sinkTypes.add(result.getType());
-            sinkTables.addAll(result.getObjects());
+
+            addIfNotBlank(sinkTypes, result.getSinkType());
+            addIfNotNull(sinkDatasourceIds, result.getSinkDatasourceId());
+            addTableValues(sinkTables, result.getSinkTable());
         }
 
         return JobDefinitionAnalysisResult.builder()
                 .sourceType(joinAsCsv(sourceTypes))
                 .sinkType(joinAsCsv(sinkTypes))
+                .sourceDatasourceId(firstLong(sourceDatasourceIds))
+                .sinkDatasourceId(firstLong(sinkDatasourceIds))
                 .sourceTable(JSONUtils.toJsonString(new ArrayList<>(sourceTables)))
                 .sinkTable(JSONUtils.toJsonString(new ArrayList<>(sinkTables)))
                 .build();
     }
 
+    private JobDefinitionAnalysisResult analyzePlugin(DatasourceAnalysisRole role,
+                                                      PluginConfig plugin,
+                                                      String hoconContent) {
+        if (plugin == null || plugin.getConfig() == null) {
+            return JobDefinitionAnalysisResult.builder().build();
+        }
 
-    private DatasourceAnalysisContext buildContext(DatasourceAnalysisRole role, PluginConfig plugin) {
-        return DatasourceAnalysisContext.builder()
+        DbType dbType = resolveDbType(plugin);
+        if (dbType == null) {
+            log.debug("Can not resolve dbType for script plugin, pluginName={}", plugin.getPluginName());
+            return JobDefinitionAnalysisResult.builder().build();
+        }
+
+        DataSourceProcessor processor = DataSourceUtils.getDatasourceProcessor(dbType);
+        if (processor == null || processor.getJobDefinitionAnalyzer() == null) {
+            log.debug("Can not find datasource processor or analyzer, dbType={}", dbType);
+            return JobDefinitionAnalysisResult.builder().build();
+        }
+
+        JobDefinitionAnalyzer analyzer = processor.getJobDefinitionAnalyzer();
+
+        DatasourceAnalysisContext context = DatasourceAnalysisContext.builder()
                 .mode(JobDefinitionMode.SCRIPT)
                 .role(role)
+                .dbType(dbType)
                 .pluginName(plugin.getPluginName())
+                .datasourceId(resolveDatasourceId(plugin.getConfig()))
                 .pluginConfig(plugin.getConfig())
+                .rawContent(hoconContent)
                 .build();
+
+        return analyzer.analyze(context);
     }
 
-    private String resolveDisplayPluginType(String pluginName, Config pluginConfig) {
-        if (StringUtils.isBlank(pluginName)) {
-            return "UNKNOWN";
+    private DbType resolveDbType(PluginConfig plugin) {
+        Config config = plugin.getConfig();
+
+        String dbTypeText = firstNonBlank(
+                safeGetString(config, "dbType"),
+                safeGetString(config, "db_type"),
+                safeGetString(config, "database_type")
+        );
+
+        if (StringUtils.isNotBlank(dbTypeText)) {
+            DbType dbType = parseDbType(dbTypeText);
+            if (dbType != null) {
+                return dbType;
+            }
         }
 
-        if (!"Jdbc".equalsIgnoreCase(pluginName)) {
-            return pluginName;
-        }
+        String url = firstNonBlank(
+                safeGetString(config, "url"),
+                safeGetString(config, "jdbcUrl"),
+                safeGetString(config, "jdbc_url")
+        );
 
-        String jdbcUrl = safeGetString(pluginConfig, "url");
-        DbType dbType = DataSourceUtils.resolveDbTypeByJdbcUrl(jdbcUrl);
+        DbType dbType = DataSourceUtils.resolveDbTypeByJdbcUrl(url);
         if (dbType != null) {
-            return dbType.name();
+            return dbType;
         }
 
-        return pluginName;
+        return parseDbType(plugin.getPluginName());
     }
 
-    /**
-     * 获取真正的插件配置：
-     * <p>
-     * 支持下面几种写法：
-     * <p>
-     * 1. 嵌套对象写法
-     * source {
-     * Jdbc {
-     * query = "select * from t"
-     * }
-     * }
-     * <p>
-     * 2. 数组写法
-     * source = [
-     * {
-     * Jdbc {
-     * query = "select * from t"
-     * }
-     * }
-     * ]
-     * <p>
-     * 3. 扁平字段写法
-     * source {
-     * plugin_name = "Jdbc"
-     * query = "select * from t"
-     * }
-     */
-    private List<PluginConfig> getPluginConfigs(Config rootConfig, String path) {
+    private DbType parseDbType(String value) {
+        if (StringUtils.isBlank(value)) {
+            return null;
+        }
+
+        String normalized = value.trim()
+                .replace("-", "_")
+                .toUpperCase();
+
+        if (normalized.startsWith("JDBC_")) {
+            normalized = normalized.substring("JDBC_".length());
+        }
+
+        try {
+            return DbType.valueOf(normalized);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private Long resolveDatasourceId(Config config) {
+        String value = firstNonBlank(
+                safeGetString(config, "dataSourceId"),
+                safeGetString(config, "datasourceId"),
+                safeGetString(config, "datasource_id")
+        );
+
+        if (StringUtils.isBlank(value)) {
+            return null;
+        }
+
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    public List<PluginConfig> getPluginConfigs(Config rootConfig, String path) {
         List<PluginConfig> result = new ArrayList<>();
 
         if (rootConfig == null || !rootConfig.hasPath(path)) {
             return result;
         }
 
-        // 先兼容 list
         try {
             List<? extends Config> configList = rootConfig.getConfigList(path);
             for (Config item : configList) {
@@ -169,7 +214,6 @@ public class ScriptJobDefinitionParser {
             // ignore
         }
 
-        // 再兼容 object
         try {
             Config block = rootConfig.getConfig(path);
             result.addAll(extractPluginConfigsFromSingleBlock(block));
@@ -181,7 +225,18 @@ public class ScriptJobDefinitionParser {
     }
 
     /**
-     * 从单个 source/sink block 中提取插件节点
+     * 从单个 source/sink block 中提取插件节点。
+     *
+     * 兼容：
+     * source {
+     *   Jdbc { ... }
+     * }
+     *
+     * 也兼容：
+     * source {
+     *   plugin_name = "Jdbc"
+     *   ...
+     * }
      */
     private List<PluginConfig> extractPluginConfigsFromSingleBlock(Config block) {
         List<PluginConfig> result = new ArrayList<>();
@@ -189,14 +244,12 @@ public class ScriptJobDefinitionParser {
             return result;
         }
 
-        // 先尝试扁平字段写法
         String explicitPluginType = resolvePluginType(block);
         if (!"UNKNOWN".equals(explicitPluginType)) {
             result.add(new PluginConfig(explicitPluginType, block));
             return result;
         }
 
-        // 再尝试把一级 key 当成插件名，例如 Jdbc / Console / FakeSource
         Set<Map.Entry<String, ConfigValue>> entries = block.root().entrySet();
         for (Map.Entry<String, ConfigValue> entry : entries) {
             String key = entry.getKey();
@@ -217,121 +270,17 @@ public class ScriptJobDefinitionParser {
 
     private String resolvePluginType(Config config) {
         if (config == null) {
-            return "";
+            return "UNKNOWN";
         }
 
-        if (config.hasPath("plugin_name")) {
-            return safeGetString(config, "plugin_name");
-        }
-        if (config.hasPath("pluginName")) {
-            return safeGetString(config, "pluginName");
-        }
-        if (config.hasPath("factory")) {
-            return safeGetString(config, "factory");
-        }
-        if (config.hasPath("type")) {
-            return safeGetString(config, "type");
-        }
-        return "UNKNOWN";
-    }
+        String pluginType = firstNonBlank(
+                safeGetString(config, "plugin_name"),
+                safeGetString(config, "pluginName"),
+                safeGetString(config, "factory"),
+                safeGetString(config, "type")
+        );
 
-    private List<String> extractSourceTables(Config config) {
-        Set<String> tables = new LinkedHashSet<>();
-
-        String query = safeGetString(config, "query");
-        if (StringUtils.isNotBlank(query)) {
-            tables.addAll(extractTablesFromSourceQuery(query));
-        }
-
-        String tablePath = safeGetString(config, "table_path");
-        if (StringUtils.isNotBlank(tablePath)) {
-            tables.add(normalizeTableName(tablePath));
-        }
-
-        String table = safeGetString(config, "table");
-        if (StringUtils.isNotBlank(table)) {
-            tables.add(normalizeTableName(table));
-        }
-
-        if (config.hasPath("table_list")) {
-            try {
-                List<String> tableList = config.getStringList("table_list");
-                if (CollectionUtils.isNotEmpty(tableList)) {
-                    for (String item : tableList) {
-                        if (StringUtils.isNotBlank(item)) {
-                            tables.add(normalizeTableName(item));
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                log.debug("Read source table_list failed", e);
-            }
-        }
-
-        return new ArrayList<>(tables);
-    }
-
-    private List<String> extractSinkTables(Config config) {
-        Set<String> tables = new LinkedHashSet<>();
-
-        String query = safeGetString(config, "query");
-        if (StringUtils.isNotBlank(query)) {
-            tables.addAll(extractTablesFromSinkQuery(query));
-        }
-
-        String table = safeGetString(config, "table");
-        if (StringUtils.isNotBlank(table)) {
-            tables.add(normalizeTableName(table));
-        }
-
-        String tablePath = safeGetString(config, "table_path");
-        if (StringUtils.isNotBlank(tablePath)) {
-            tables.add(normalizeTableName(tablePath));
-        }
-
-        return new ArrayList<>(tables);
-    }
-
-    private List<String> extractTablesFromSourceQuery(String query) {
-        Set<String> tables = new LinkedHashSet<>();
-        Matcher matcher = FROM_TABLE_PATTERN.matcher(query);
-        while (matcher.find()) {
-            String table = matcher.group(1);
-            if (StringUtils.isNotBlank(table)) {
-                tables.add(normalizeTableName(table));
-            }
-        }
-        return new ArrayList<>(tables);
-    }
-
-    private List<String> extractTablesFromSinkQuery(String query) {
-        Set<String> tables = new LinkedHashSet<>();
-
-        Matcher intoMatcher = INTO_TABLE_PATTERN.matcher(query);
-        while (intoMatcher.find()) {
-            String table = intoMatcher.group(1);
-            if (StringUtils.isNotBlank(table)) {
-                tables.add(normalizeTableName(table));
-            }
-        }
-
-        Matcher updateMatcher = UPDATE_TABLE_PATTERN.matcher(query);
-        while (updateMatcher.find()) {
-            String table = updateMatcher.group(1);
-            if (StringUtils.isNotBlank(table)) {
-                tables.add(normalizeTableName(table));
-            }
-        }
-
-        Matcher fromMatcher = FROM_TABLE_PATTERN.matcher(query);
-        while (fromMatcher.find()) {
-            String table = fromMatcher.group(1);
-            if (StringUtils.isNotBlank(table)) {
-                tables.add(normalizeTableName(table));
-            }
-        }
-
-        return new ArrayList<>(tables);
+        return StringUtils.isBlank(pluginType) ? "UNKNOWN" : pluginType;
     }
 
     private String safeGetString(Config config, String path) {
@@ -345,20 +294,64 @@ public class ScriptJobDefinitionParser {
         return "";
     }
 
-    private String normalizeTableName(String raw) {
-        if (raw == null) {
+    private String firstNonBlank(String... values) {
+        if (values == null) {
             return "";
         }
 
-        String value = raw.trim();
-
-        if ((value.startsWith("\"") && value.endsWith("\""))
-                || (value.startsWith("`") && value.endsWith("`"))
-                || (value.startsWith("[") && value.endsWith("]"))) {
-            value = value.substring(1, value.length() - 1);
+        for (String value : values) {
+            if (StringUtils.isNotBlank(value)) {
+                return value.trim();
+            }
         }
 
-        return value.trim();
+        return "";
+    }
+
+    private void addIfNotBlank(Set<String> values, String value) {
+        if (StringUtils.isNotBlank(value)) {
+            values.add(value.trim());
+        }
+    }
+
+    private void addIfNotNull(Set<Long> values, Long value) {
+        if (value != null) {
+            values.add(value);
+        }
+    }
+
+    /**
+     * 兼容 analyzer 返回：
+     * 1. 单表：test_user
+     * 2. 多表 JSON：["test_user","test_order"]
+     */
+    private void addTableValues(Set<String> values, String tableValue) {
+        if (StringUtils.isBlank(tableValue)) {
+            return;
+        }
+
+        String text = tableValue.trim();
+        if (text.startsWith("[") && text.endsWith("]")) {
+            try {
+                Config config = ConfigFactory.parseString("tables = " + text);
+                List<String> tables = config.getStringList("tables");
+                for (String table : tables) {
+                    addIfNotBlank(values, table);
+                }
+                return;
+            } catch (Exception e) {
+                log.debug("Parse table json list failed, value={}", tableValue, e);
+            }
+        }
+
+        addIfNotBlank(values, text);
+    }
+
+    private Long firstLong(Set<Long> values) {
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        return values.iterator().next();
     }
 
     private String joinAsCsv(Set<String> values) {
@@ -371,21 +364,5 @@ public class ScriptJobDefinitionParser {
         return String.join(",", cleaned);
     }
 
-    private static class PluginConfig {
-        private final String pluginName;
-        private final Config config;
 
-        public PluginConfig(String pluginName, Config config) {
-            this.pluginName = pluginName;
-            this.config = config;
-        }
-
-        public String getPluginName() {
-            return pluginName;
-        }
-
-        public Config getConfig() {
-            return config;
-        }
-    }
 }

@@ -4,9 +4,9 @@ import com.typesafe.config.Config;
 import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.web.common.enums.JobDefinitionMode;
+import org.apache.seatunnel.web.common.modal.JobDefinitionAnalysisResult;
 import org.apache.seatunnel.web.common.utils.JSONUtils;
 import org.apache.seatunnel.web.core.job.handler.JobDefinitionModeHandler;
-import org.apache.seatunnel.web.core.job.model.JobDefinitionAnalysisResult;
 import org.apache.seatunnel.web.spi.bean.dto.command.JobDefinitionSaveCommand;
 import org.apache.seatunnel.web.spi.bean.dto.command.ScriptJobContentCommand;
 import org.apache.seatunnel.web.spi.bean.dto.config.ScriptJobContent;
@@ -17,6 +17,9 @@ public class ScriptJobDefinitionHandler implements JobDefinitionModeHandler {
 
     @Resource
     private ScriptJobDefinitionParser scriptJobDefinitionParser;
+
+    @Resource
+    private ScriptHoconBuildService scriptHoconBuildService;
 
     @Override
     public boolean supports(JobDefinitionMode mode) {
@@ -60,7 +63,7 @@ public class ScriptJobDefinitionHandler implements JobDefinitionModeHandler {
     @Override
     public String buildHoconConfig(JobDefinitionSaveCommand command) {
         ScriptJobContentCommand cmd = cast(command);
-        return cmd.getContent().getHoconContent();
+        return scriptHoconBuildService.build(cmd.getContent(), command);
     }
 
     private ScriptJobContentCommand cast(JobDefinitionSaveCommand command) {

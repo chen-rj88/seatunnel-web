@@ -1,4 +1,4 @@
-package org.apache.seatunnel.web.core.job.model;
+package org.apache.seatunnel.web.common.modal;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
