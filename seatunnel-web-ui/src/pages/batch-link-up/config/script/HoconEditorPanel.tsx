@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { EditorState } from "@codemirror/state";
+import { useEffect, useRef, useState } from "react";
+import { EditorState, Text } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import {
@@ -9,10 +9,73 @@ import {
 } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 
+import { fetchDataSourceOptions } from "@/pages/data-source/service";
+
 interface Props {
   value: string;
   onChange: (value: string) => void;
+
+  /**
+   * source 域要查询的数据源类型
+   * 例如：MYSQL / MYSQL_CDC / POSTGRESQL / ORACLE
+   */
+  sourceDbType?: string;
+
+  /**
+   * sink 域要查询的数据源类型
+   * 例如：MYSQL / POSTGRESQL / ORACLE
+   */
+  sinkDbType?: string;
 }
+
+type DatasourceOption = {
+  id: string | number;
+  name: string;
+  dbType?: string;
+  description?: string;
+};
+
+type HoconState = {
+  inBlockComment: boolean;
+};
+
+type HoconArea = "source" | "sink";
+
+type HoconBlockInfo = {
+  area?: HoconArea;
+  pluginName?: string;
+};
+
+type AtRange = {
+  from: number;
+  to: number;
+  text: string;
+};
+
+type DropdownState = {
+  visible: boolean;
+  loading: boolean;
+  left: number;
+  top: number;
+  from: number;
+  to: number;
+  keyword: string;
+  area?: HoconArea;
+  dbType?: string;
+  options: DatasourceOption[];
+  message?: string;
+};
+
+const DEFAULT_DROPDOWN_STATE: DropdownState = {
+  visible: false,
+  loading: false,
+  left: 0,
+  top: 0,
+  from: 0,
+  to: 0,
+  keyword: "",
+  options: [],
+};
 
 const DEFAULT_TEMPLATE = `env {
   jobMode = "BATCH"
@@ -20,24 +83,234 @@ const DEFAULT_TEMPLATE = `env {
 }
 
 source {
-  # 例如：
   Jdbc {
-    url = "jdbc:mysql://127.0.0.1:3306/demo"
-    user = "root"
-    password = "123456"
-    query = "select * from t_user"
+    datasourceId = @
   }
 }
 
 sink {
-  # 例如：
-  Console {}
+  Jdbc {
+    datasourceId = @
+  }
 }
 `;
 
-type HoconState = {
-  inBlockComment: boolean;
-};
+function normalizeDatasourceOptions(data: any): DatasourceOption[] {
+  const list = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.records)
+      ? data.records
+      : Array.isArray(data?.list)
+        ? data.list
+        : Array.isArray(data?.items)
+          ? data.items
+          : [];
+
+  return list
+    .map((item: any) => {
+      const id =
+        item?.id ??
+        item?.datasourceId ??
+        item?.dataSourceId ??
+        item?.value;
+
+      const name =
+        item?.name ??
+        item?.datasourceName ??
+        item?.dataSourceName ??
+        item?.label ??
+        item?.datasource_name ??
+        `Datasource-${id}`;
+
+      const dbType =
+        item?.dbType ??
+        item?.type ??
+        item?.datasourceType ??
+        item?.dataSourceType;
+
+      const description =
+        item?.description ??
+        item?.url ??
+        item?.jdbcUrl ??
+        item?.jdbc_url ??
+        item?.remark;
+
+      return {
+        id,
+        name,
+        dbType,
+        description,
+      };
+    })
+    .filter((item) => item.id !== undefined && item.id !== null);
+}
+
+/**
+ * 获取当前光标前面的 @xxx。
+ *
+ * 例如：
+ * datasourceId = @
+ * datasourceId = @mysql
+ */
+function getAtRange(doc: Text, pos: number): AtRange | null {
+  const line = doc.lineAt(pos);
+  const lineTextBeforeCursor = doc.sliceString(line.from, pos);
+  const match = lineTextBeforeCursor.match(/@[\w.-]*$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const text = match[0];
+
+  return {
+    from: pos - text.length,
+    to: pos,
+    text,
+  };
+}
+
+/**
+ * 判断当前光标属于 source 还是 sink。
+ *
+ * 支持：
+ *
+ * source {
+ *   Jdbc {
+ *     datasourceId = @
+ *   }
+ * }
+ */
+function getCurrentHoconBlockInfo(doc: Text, pos: number): HoconBlockInfo {
+  const text = doc.sliceString(0, pos);
+
+  const stack: string[] = [];
+  let lastIdentifier = "";
+
+  let inString = false;
+  let escaped = false;
+  let inLineComment = false;
+  let inBlockComment = false;
+
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    const next = text[i + 1];
+
+    if (inLineComment) {
+      if (ch === "\n") {
+        inLineComment = false;
+      }
+      continue;
+    }
+
+    if (inBlockComment) {
+      if (ch === "*" && next === "/") {
+        inBlockComment = false;
+        i += 1;
+      }
+      continue;
+    }
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+
+      if (ch === "\\") {
+        escaped = true;
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = false;
+      }
+
+      continue;
+    }
+
+    if (ch === "#") {
+      inLineComment = true;
+      continue;
+    }
+
+    if (ch === "/" && next === "/") {
+      inLineComment = true;
+      i += 1;
+      continue;
+    }
+
+    if (ch === "/" && next === "*") {
+      inBlockComment = true;
+      i += 1;
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (/[A-Za-z_]/.test(ch)) {
+      let j = i + 1;
+
+      while (j < text.length && /[\w.-]/.test(text[j])) {
+        j += 1;
+      }
+
+      lastIdentifier = text.slice(i, j);
+      i = j - 1;
+      continue;
+    }
+
+    if (ch === "{") {
+      stack.push(lastIdentifier);
+      lastIdentifier = "";
+      continue;
+    }
+
+    if (ch === "}") {
+      stack.pop();
+      lastIdentifier = "";
+    }
+  }
+
+  const lowerStack = stack.map((item) => item.toLowerCase());
+
+  const sourceIndex = lowerStack.lastIndexOf("source");
+  const sinkIndex = lowerStack.lastIndexOf("sink");
+
+  if (sourceIndex === -1 && sinkIndex === -1) {
+    return {};
+  }
+
+  const area: HoconArea = sourceIndex > sinkIndex ? "source" : "sink";
+  const areaIndex = area === "source" ? sourceIndex : sinkIndex;
+
+  return {
+    area,
+    pluginName: stack[areaIndex + 1],
+  };
+}
+
+function filterDatasourceOptions(
+  options: DatasourceOption[],
+  keyword: string,
+): DatasourceOption[] {
+  if (!keyword) {
+    return options;
+  }
+
+  const lowerKeyword = keyword.toLowerCase();
+
+  return options.filter((item) => {
+    return (
+      String(item.id).toLowerCase().includes(lowerKeyword) ||
+      item.name.toLowerCase().includes(lowerKeyword) ||
+      item.dbType?.toLowerCase().includes(lowerKeyword)
+    );
+  });
+}
 
 const hoconLanguage = StreamLanguage.define<HoconState>({
   startState() {
@@ -97,12 +370,16 @@ const hoconLanguage = StreamLanguage.define<HoconState>({
       return "bool";
     }
 
-    if (stream.match(/\b\d+(\.\d+)?\b/)) {
+    if (stream.match(/\b\d+(\.\d)?\b/)) {
       return "number";
     }
 
     if (stream.match(/\b(env|job|source|sink|transform|include)\b/)) {
       return "keyword";
+    }
+
+    if (stream.match(/@[\w.-]*/)) {
+      return "variableName";
     }
 
     if (stream.match(/[A-Za-z_][\w.-]*/)) {
@@ -160,7 +437,8 @@ const hoconHighlightStyle = HighlightStyle.define([
   },
   {
     tag: tags.variableName,
-    color: "#475569",
+    color: "#2563eb",
+    fontWeight: "600",
   },
   {
     tag: [tags.brace, tags.squareBracket],
@@ -244,13 +522,220 @@ const editorTheme = EditorView.theme({
   },
 });
 
-export default function HoconEditorPanel({ value, onChange }: Props) {
+export default function HoconEditorPanel({
+  value,
+  onChange,
+  sourceDbType,
+  sinkDbType,
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const editorBoxRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
+
+  const onChangeRef = useRef(onChange);
+  const sourceDbTypeRef = useRef<string | undefined>(sourceDbType);
+  const sinkDbTypeRef = useRef<string | undefined>(sinkDbType);
+  const datasourceCacheRef = useRef<Map<string, DatasourceOption[]>>(new Map());
+  const dropdownStateRef = useRef<DropdownState>(DEFAULT_DROPDOWN_STATE);
+  const requestSeqRef = useRef(0);
+
+  const [dropdownState, setDropdownState] = useState<DropdownState>(
+    DEFAULT_DROPDOWN_STATE,
+  );
+
+  const updateDropdownState = (nextState: DropdownState) => {
+    dropdownStateRef.current = nextState;
+    setDropdownState(nextState);
+  };
+
+  const hideDropdown = () => {
+    updateDropdownState({
+      ...dropdownStateRef.current,
+      visible: false,
+      loading: false,
+      options: [],
+      message: undefined,
+    });
+  };
+
+  const openDatasourceDropdown = async (view: EditorView, atRange: AtRange) => {
+    const editorBox = editorBoxRef.current;
+    const cursorCoords = view.coordsAtPos(atRange.to);
+
+    if (!editorBox || !cursorCoords) {
+      hideDropdown();
+      return;
+    }
+
+    const editorBoxRect = editorBox.getBoundingClientRect();
+
+    const left = cursorCoords.left - editorBoxRect.left;
+    const top = cursorCoords.bottom - editorBoxRect.top + 6;
+
+    const blockInfo = getCurrentHoconBlockInfo(view.state.doc, atRange.to);
+    const keyword = atRange.text.slice(1);
+
+    if (!blockInfo.area) {
+      updateDropdownState({
+        visible: true,
+        loading: false,
+        left,
+        top,
+        from: atRange.from,
+        to: atRange.to,
+        keyword,
+        options: [],
+        message: "请在 source 或 sink 域内使用 @",
+      });
+      return;
+    }
+
+    const dbType =
+      blockInfo.area === "source"
+        ? sourceDbTypeRef.current
+        : sinkDbTypeRef.current;
+
+    if (!dbType) {
+      updateDropdownState({
+        visible: true,
+        loading: false,
+        left,
+        top,
+        from: atRange.from,
+        to: atRange.to,
+        keyword,
+        area: blockInfo.area,
+        options: [],
+        message:
+          blockInfo.area === "source"
+            ? "未选择 source 数据源类型"
+            : "未选择 sink 数据源类型",
+      });
+      return;
+    }
+
+    const cacheKey = `${blockInfo.area}:${dbType}`;
+    const cachedOptions = datasourceCacheRef.current.get(cacheKey);
+
+    if (cachedOptions) {
+      const filteredOptions = filterDatasourceOptions(cachedOptions, keyword);
+
+      updateDropdownState({
+        visible: true,
+        loading: false,
+        left,
+        top,
+        from: atRange.from,
+        to: atRange.to,
+        keyword,
+        area: blockInfo.area,
+        dbType,
+        options: filteredOptions,
+        message: filteredOptions.length ? undefined : `没有找到 ${dbType} 数据源`,
+      });
+
+      return;
+    }
+
+    const currentRequestSeq = requestSeqRef.current + 1;
+    requestSeqRef.current = currentRequestSeq;
+
+    updateDropdownState({
+      visible: true,
+      loading: true,
+      left,
+      top,
+      from: atRange.from,
+      to: atRange.to,
+      keyword,
+      area: blockInfo.area,
+      dbType,
+      options: [],
+      message: undefined,
+    });
+
+    try {
+      const response = await fetchDataSourceOptions(dbType);
+
+      if (requestSeqRef.current !== currentRequestSeq) {
+        return;
+      }
+
+      const datasourceOptions = normalizeDatasourceOptions(response?.data);
+      datasourceCacheRef.current.set(cacheKey, datasourceOptions);
+
+      const latestState = dropdownStateRef.current;
+      const latestKeyword = latestState.keyword;
+      const filteredOptions = filterDatasourceOptions(
+        datasourceOptions,
+        latestKeyword,
+      );
+
+      updateDropdownState({
+        ...latestState,
+        visible: true,
+        loading: false,
+        options: filteredOptions,
+        message: filteredOptions.length
+          ? undefined
+          : `没有找到 ${dbType} 数据源`,
+      });
+    } catch (error) {
+      if (requestSeqRef.current !== currentRequestSeq) {
+        return;
+      }
+
+      updateDropdownState({
+        ...dropdownStateRef.current,
+        visible: true,
+        loading: false,
+        options: [],
+        message: "数据源加载失败，请稍后重试",
+      });
+    }
+  };
+
+  const insertDatasourceId = (option: DatasourceOption) => {
+    const view = viewRef.current;
+    const currentDropdownState = dropdownStateRef.current;
+
+    if (!view || !currentDropdownState.visible) {
+      return;
+    }
+
+    const insertText = String(option.id);
+
+    view.dispatch({
+      changes: {
+        from: currentDropdownState.from,
+        to: currentDropdownState.to,
+        insert: insertText,
+      },
+      selection: {
+        anchor: currentDropdownState.from + insertText.length,
+      },
+    });
+
+    view.focus();
+    hideDropdown();
+  };
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    sourceDbTypeRef.current = sourceDbType;
+    sinkDbTypeRef.current = sinkDbType;
+  }, [sourceDbType, sinkDbType]);
+
+  useEffect(() => {
+    datasourceCacheRef.current.clear();
+  }, [sourceDbType, sinkDbType]);
 
   useEffect(() => {
     if (!value?.trim()) {
-      onChange(DEFAULT_TEMPLATE);
+      onChangeRef.current(DEFAULT_TEMPLATE);
     }
   }, []);
 
@@ -270,14 +755,28 @@ export default function HoconEditorPanel({ value, onChange }: Props) {
         lineNumbers(),
         editorTheme,
         EditorView.lineWrapping,
+
         EditorView.updateListener.of((update) => {
-          if (!update.docChanged) return;
-
-          const nextValue = update.state.doc.toString();
-
-          if (nextValue !== value) {
-            onChange(nextValue);
+          if (update.docChanged) {
+            const nextValue = update.state.doc.toString();
+            onChangeRef.current(nextValue);
           }
+
+          if (!update.docChanged && !update.selectionSet) {
+            return;
+          }
+
+          const head = update.state.selection.main.head;
+          const atRange = getAtRange(update.state.doc, head);
+
+          if (!atRange) {
+            if (dropdownStateRef.current.visible) {
+              hideDropdown();
+            }
+            return;
+          }
+
+          openDatasourceDropdown(update.view, atRange);
         }),
       ],
     });
@@ -300,7 +799,7 @@ export default function HoconEditorPanel({ value, onChange }: Props) {
 
     const current = view.state.doc.toString();
 
-    if (value !== current && typeof value === "string") {
+    if (typeof value === "string" && value !== current) {
       view.dispatch({
         changes: {
           from: 0,
@@ -314,10 +813,82 @@ export default function HoconEditorPanel({ value, onChange }: Props) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1">
-        <div className="h-full rounded-[18px] border border-slate-200 bg-[#FCFDFE] p-[1px] transition-all duration-200 focus-within:border-blue-200">
+        <div
+          ref={editorBoxRef}
+          className="relative h-full rounded-[18px] border border-slate-200 bg-[#FCFDFE] p-[1px] transition-all duration-200 focus-within:border-blue-200"
+        >
           <div className="h-full overflow-hidden rounded-[14px]">
             <div ref={containerRef} className="h-full" />
           </div>
+
+          {dropdownState.visible && (
+            <div
+              className="absolute z-[9999] w-[280px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.14)]"
+              style={{
+                left: dropdownState.left,
+                top: dropdownState.top,
+              }}
+              onMouseDown={(event) => {
+                /**
+                 * 防止点击下拉框时 editor 失焦，导致选择不稳定。
+                 */
+                event.preventDefault();
+              }}
+            >
+              <div className="border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
+                {dropdownState.area === "source"
+                  ? "选择 Source 数据源"
+                  : dropdownState.area === "sink"
+                    ? "选择 Sink 数据源"
+                    : "选择数据源"}
+                {dropdownState.dbType ? (
+                  <span className="ml-2 rounded-full bg-blue-50 px-2 py-[2px] text-[11px] text-blue-600">
+                    {dropdownState.dbType}
+                  </span>
+                ) : null}
+              </div>
+
+              {dropdownState.loading ? (
+                <div className="px-3 py-3 text-sm text-slate-400">
+                  正在加载数据源...
+                </div>
+              ) : dropdownState.message ? (
+                <div className="px-3 py-3 text-sm text-slate-400">
+                  {dropdownState.message}
+                </div>
+              ) : (
+                <div className="max-h-[260px] overflow-auto py-1">
+                  {dropdownState.options.map((item) => (
+                    <button
+                      key={`${item.id}-${item.name}`}
+                      type="button"
+                      className="flex w-full cursor-pointer items-start gap-2 px-3 py-2 text-left transition-colors hover:bg-blue-50"
+                      onClick={() => insertDatasourceId(item)}
+                    >
+                      <div className="mt-[2px] flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[11px] font-semibold text-slate-500">
+                        DS
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm font-semibold text-slate-700">
+                            {item.name}
+                          </span>
+                          <span className="shrink-0 rounded bg-slate-100 px-1.5 py-[1px] text-[11px] text-slate-500">
+                            ID: {item.id}
+                          </span>
+                        </div>
+
+                        <div className="mt-1 truncate text-xs text-slate-400">
+                          {item.description || item.dbType || "Datasource"}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
