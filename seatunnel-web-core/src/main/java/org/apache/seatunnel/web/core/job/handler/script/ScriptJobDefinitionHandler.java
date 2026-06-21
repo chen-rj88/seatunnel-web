@@ -18,6 +18,9 @@ public class ScriptJobDefinitionHandler implements JobDefinitionModeHandler {
     @Resource
     private ScriptJobDefinitionParser scriptJobDefinitionParser;
 
+    @Resource
+    private ScriptHoconBuildService scriptHoconBuildService;
+
     @Override
     public boolean supports(JobDefinitionMode mode) {
         return JobDefinitionMode.SCRIPT == mode;
@@ -60,7 +63,7 @@ public class ScriptJobDefinitionHandler implements JobDefinitionModeHandler {
     @Override
     public String buildHoconConfig(JobDefinitionSaveCommand command) {
         ScriptJobContentCommand cmd = cast(command);
-        return cmd.getContent().getHoconContent();
+        return scriptHoconBuildService.build(cmd.getContent(), command);
     }
 
     private ScriptJobContentCommand cast(JobDefinitionSaveCommand command) {

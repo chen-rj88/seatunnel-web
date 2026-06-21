@@ -195,7 +195,7 @@ public class ScriptJobDefinitionParser {
         }
     }
 
-    private List<PluginConfig> getPluginConfigs(Config rootConfig, String path) {
+    public List<PluginConfig> getPluginConfigs(Config rootConfig, String path) {
         List<PluginConfig> result = new ArrayList<>();
 
         if (rootConfig == null || !rootConfig.hasPath(path)) {
@@ -364,21 +364,5 @@ public class ScriptJobDefinitionParser {
         return String.join(",", cleaned);
     }
 
-    private static class PluginConfig {
-        private final String pluginName;
-        private final Config config;
 
-        public PluginConfig(String pluginName, Config config) {
-            this.pluginName = pluginName;
-            this.config = config;
-        }
-
-        public String getPluginName() {
-            return pluginName;
-        }
-
-        public Config getConfig() {
-            return config;
-        }
-    }
 }

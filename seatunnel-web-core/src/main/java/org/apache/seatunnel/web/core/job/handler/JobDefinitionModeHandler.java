@@ -7,23 +7,24 @@ import org.apache.seatunnel.web.spi.bean.dto.command.JobDefinitionSaveCommand;
 public interface JobDefinitionModeHandler {
 
     /**
-     * 只按定义模式匹配：
+     * Match only by job definition mode:
      * SCRIPT / GUIDE_SINGLE / GUIDE_MULTI
      */
     boolean supports(JobDefinitionMode mode);
 
     /**
-     * 校验当前模式下的内容。
+     * Validate the definition content for the current mode.
      */
     void validate(JobDefinitionSaveCommand command);
 
     /**
-     * 分析 source/sink 类型、表名、数据源 ID 等摘要信息。
+     * Analyze summary information such as source/sink type,
+     * table name, datasource ID, and other metadata.
      */
     JobDefinitionAnalysisResult analyze(JobDefinitionSaveCommand command);
 
     /**
-     * 序列化定义内容。
+     * Serialize the job definition content.
      *
      * SCRIPT       -> ScriptJobContent JSON
      * GUIDE_SINGLE -> workflow JSON
@@ -32,7 +33,7 @@ public interface JobDefinitionModeHandler {
     String serializeDefinition(JobDefinitionSaveCommand command);
 
     /**
-     * 构建 SeaTunnel HOCON。
+     * Build the SeaTunnel HOCON configuration.
      */
     String buildHoconConfig(JobDefinitionSaveCommand command);
 }
