@@ -1,14 +1,15 @@
-import { useEffect, useRef, useState } from "react";
-import { EditorState, Text } from "@codemirror/state";
-import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import {
   HighlightStyle,
   StreamLanguage,
   syntaxHighlighting,
 } from "@codemirror/language";
+import { EditorState, Text } from "@codemirror/state";
+import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { tags } from "@lezer/highlight";
+import { useEffect, useRef, useState } from "react";
 
+import DatabaseIcons from "@/pages/data-source/icon/DatabaseIcons";
 import { fetchDataSourceOptions } from "@/pages/data-source/service";
 
 interface Props {
@@ -99,20 +100,17 @@ function normalizeDatasourceOptions(data: any): DatasourceOption[] {
   const list = Array.isArray(data)
     ? data
     : Array.isArray(data?.records)
-      ? data.records
-      : Array.isArray(data?.list)
-        ? data.list
-        : Array.isArray(data?.items)
-          ? data.items
-          : [];
+    ? data.records
+    : Array.isArray(data?.list)
+    ? data.list
+    : Array.isArray(data?.items)
+    ? data.items
+    : [];
 
   return list
     .map((item: any) => {
       const id =
-        item?.id ??
-        item?.datasourceId ??
-        item?.dataSourceId ??
-        item?.value;
+        item?.id ?? item?.datasourceId ?? item?.dataSourceId ?? item?.value;
 
       const name =
         item?.name ??
@@ -295,7 +293,7 @@ function getCurrentHoconBlockInfo(doc: Text, pos: number): HoconBlockInfo {
 
 function filterDatasourceOptions(
   options: DatasourceOption[],
-  keyword: string,
+  keyword: string
 ): DatasourceOption[] {
   if (!keyword) {
     return options;
@@ -540,7 +538,7 @@ export default function HoconEditorPanel({
   const requestSeqRef = useRef(0);
 
   const [dropdownState, setDropdownState] = useState<DropdownState>(
-    DEFAULT_DROPDOWN_STATE,
+    DEFAULT_DROPDOWN_STATE
   );
 
   const updateDropdownState = (nextState: DropdownState) => {
@@ -631,7 +629,9 @@ export default function HoconEditorPanel({
         area: blockInfo.area,
         dbType,
         options: filteredOptions,
-        message: filteredOptions.length ? undefined : `没有找到 ${dbType} 数据源`,
+        message: filteredOptions.length
+          ? undefined
+          : `没有找到 ${dbType} 数据源`,
       });
 
       return;
@@ -668,7 +668,7 @@ export default function HoconEditorPanel({
       const latestKeyword = latestState.keyword;
       const filteredOptions = filterDatasourceOptions(
         datasourceOptions,
-        latestKeyword,
+        latestKeyword
       );
 
       updateDropdownState({
@@ -822,73 +822,80 @@ export default function HoconEditorPanel({
           </div>
 
           {dropdownState.visible && (
-            <div
-              className="absolute z-[9999] w-[280px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_16px_40px_rgba(15,23,42,0.14)]"
-              style={{
-                left: dropdownState.left,
-                top: dropdownState.top,
-              }}
-              onMouseDown={(event) => {
-                /**
-                 * 防止点击下拉框时 editor 失焦，导致选择不稳定。
-                 */
-                event.preventDefault();
-              }}
-            >
-              <div className="border-b border-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
-                {dropdownState.area === "source"
-                  ? "选择 Source 数据源"
-                  : dropdownState.area === "sink"
-                    ? "选择 Sink 数据源"
-                    : "选择数据源"}
-                {dropdownState.dbType ? (
-                  <span className="ml-2 rounded-full bg-blue-50 px-2 py-[2px] text-[11px] text-blue-600">
-                    {dropdownState.dbType}
-                  </span>
-                ) : null}
+  <div
+    className="absolute z-[9999] w-[320px] overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.10)]"
+    style={{
+      left: dropdownState.left,
+      top: dropdownState.top,
+    }}
+    onMouseDown={(event) => {
+      event.preventDefault();
+    }}
+  >
+    <div className="border-b border-slate-100 bg-slate-50/80 px-3.5 py-3">
+      <div className="flex items-center justify-between">
+        <div className="text-[13px] font-semibold text-slate-700">
+          {dropdownState.area === "source"
+            ? "选择 Source 数据源"
+            : dropdownState.area === "sink"
+            ? "选择 Sink 数据源"
+            : "选择数据源"}
+        </div>
+
+        {dropdownState.dbType ? (
+          <span className="rounded-md border border-blue-100 bg-blue-50 px-2 py-[2px] text-[11px] font-medium text-blue-600">
+            {dropdownState.dbType}
+          </span>
+        ) : null}
+      </div>
+
+      <div className="mt-1 text-[12px] leading-5 text-slate-400">
+        选择后会自动填充 datasourceId
+      </div>
+    </div>
+
+    {dropdownState.loading ? (
+      <div className="px-3.5 py-4 text-[13px] text-slate-400">
+        正在加载数据源...
+      </div>
+    ) : dropdownState.message ? (
+      <div className="px-3.5 py-4 text-[13px] text-slate-400">
+        {dropdownState.message}
+      </div>
+    ) : (
+      <div className="max-h-[260px] overflow-auto py-1.5">
+        {dropdownState.options.map((item) => (
+          <button
+            key={`${item.id}-${item.name}`}
+            type="button"
+            className="group flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2.5 text-left transition-colors hover:bg-slate-50"
+            onClick={() => insertDatasourceId(item)}
+          >
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-slate-100 bg-white text-slate-500 shadow-sm">
+              <DatabaseIcons dbType={item.dbType} />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="truncate text-[13px] font-medium text-slate-700 group-hover:text-blue-600">
+                  {item.name}
+                </span>
+
+                <span className="shrink-0 rounded bg-slate-100 px-1.5 py-[1px] text-[11px] text-slate-500">
+                  ID: {item.id}
+                </span>
               </div>
 
-              {dropdownState.loading ? (
-                <div className="px-3 py-3 text-sm text-slate-400">
-                  正在加载数据源...
-                </div>
-              ) : dropdownState.message ? (
-                <div className="px-3 py-3 text-sm text-slate-400">
-                  {dropdownState.message}
-                </div>
-              ) : (
-                <div className="max-h-[260px] overflow-auto py-1">
-                  {dropdownState.options.map((item) => (
-                    <button
-                      key={`${item.id}-${item.name}`}
-                      type="button"
-                      className="flex w-full cursor-pointer items-start gap-2 px-3 py-2 text-left transition-colors hover:bg-blue-50"
-                      onClick={() => insertDatasourceId(item)}
-                    >
-                      <div className="mt-[2px] flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-[11px] font-semibold text-slate-500">
-                        DS
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate text-sm font-semibold text-slate-700">
-                            {item.name}
-                          </span>
-                          <span className="shrink-0 rounded bg-slate-100 px-1.5 py-[1px] text-[11px] text-slate-500">
-                            ID: {item.id}
-                          </span>
-                        </div>
-
-                        <div className="mt-1 truncate text-xs text-slate-400">
-                          {item.description || item.dbType || "Datasource"}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="mt-[2px] truncate text-[12px] text-slate-400">
+                {item.description || item.dbType || "Datasource"}
+              </div>
             </div>
-          )}
+          </button>
+        ))}
+      </div>
+    )}
+  </div>
+)}
         </div>
       </div>
     </div>
