@@ -64,6 +64,8 @@ export default function CustomWorkflow({
     envConfig,
   });
 
+  console.log(basicConfig);
+  console.log(params);
   const actionButtonClass =
     "!inline-flex !h-[34px] !items-center !justify-center !rounded-full !border !border-slate-200 !bg-slate-50 !px-3.5 !text-[13px] !font-medium !text-slate-500 transition-colors duration-200 hover:!border-slate-300 hover:!bg-white/80 hover:!text-slate-700 hover:!shadow-[0_4px_12px_rgba(15,23,42,0.05)] disabled:!cursor-not-allowed disabled:!border-slate-200 disabled:!bg-slate-100 disabled:!text-slate-400 disabled:!shadow-none";
 
@@ -211,11 +213,13 @@ export default function CustomWorkflow({
                   </Space>
                 </div>
 
-                <div className="min-h-0 flex-1 bg-white p-[18px] [background:radial-gradient(circle_at_top_left,rgba(78,116,248,0.04),transparent_22%),#ffffff]">
-                  <div className="h-full overflow-hidden rounded-2xl border border-slate-100 bg-white p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                <div className="min-h-0 flex-1  p-[18px] ">
+                  <div className="h-full overflow-hidden rounded-2xl  bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                     <HoconEditorPanel
                       value={hoconContent}
                       onChange={setHoconContent}
+                      sourceDbType={basicConfig?.sourceType}
+                      sinkDbType={basicConfig?.targetType}
                     />
                   </div>
                 </div>
