@@ -173,6 +173,8 @@
             <version>${jsqlparser.version}</version>
         </dependency>
 
+
+
     </dependencies>
 
     <build>
