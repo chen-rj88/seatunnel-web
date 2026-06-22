@@ -17,4 +17,6 @@ public class MysqlBatchBuilder extends AbstractJdbcBatchBuilder {
     public String pluginName() {
         return "JDBC-MYSQL";
     }
+
+
 }
