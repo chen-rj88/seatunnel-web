@@ -9,6 +9,7 @@ interface Props {
 }
 
 const ReferenceTablePanel: React.FC<Props> = ({ loading, data }) => {
+  console.log(data);
   return (
     <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4" style={{marginTop: 16}}>
       <div className="mb-3 flex items-center justify-between" >
@@ -28,6 +29,12 @@ const ReferenceTablePanel: React.FC<Props> = ({ loading, data }) => {
           columns={[
             {
               title: "表名",
+              dataIndex: "rawTitle",
+              key: "rawTitle",
+              ellipsis: true,
+            },
+            {
+              title: "表注释",
               dataIndex: "title",
               key: "title",
               ellipsis: true,

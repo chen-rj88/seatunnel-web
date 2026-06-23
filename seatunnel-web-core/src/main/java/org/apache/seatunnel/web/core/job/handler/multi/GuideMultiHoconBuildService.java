@@ -36,6 +36,16 @@ public class GuideMultiHoconBuildService {
     private static final String KEY_SINK_TABLE_LIST = "sink_table_list";
     private static final String KEY_TABLE_PATTERN = "tablePattern";
 
+    private static final String KEY_MATCH_MODE = "matchMode";
+    private static final String KEY_MATCH_MODE_UNDERLINE = "match_mode";
+    private static final String KEY_SOURCE_TABLE = "sourceTable";
+    private static final String KEY_TABLE_KEYWORD = "tableKeyword";
+
+    private static final String MATCH_MODE_CUSTOM = "1";
+    private static final String MATCH_MODE_REGEX = "2";
+    private static final String MATCH_MODE_EXACT = "3";
+    private static final String MATCH_MODE_WHOLE_DATABASE = "4";
+
     @Resource
     private HoconConfigBuilder hoconConfigBuilder;
 
@@ -62,15 +72,43 @@ public class GuideMultiHoconBuildService {
         return hoconConfigBuilder.build(dagGraph, runtimeContext.getEnv());
     }
 
-    private Map<String, Object> buildWorkflow(GuideMultiJobContent content,
-                                              JobRuntimeContext runtimeContext) {
-        List<String> sourceTables = tableMatchResolver.resolveSourceTables(content);
-        List<String> sinkTables = tableMatchResolver.resolveSinkTables(content);
+    private Map<String, Object> buildWorkflow(
+            GuideMultiJobContent content,
+            JobRuntimeContext runtimeContext) {
 
-        validateTables(sourceTables, sinkTables);
+        GuideMultiJobContent.TableMatchConfig tableMatch = content.getTableMatch();
+        String matchMode = resolveMatchMode(tableMatch);
+        boolean patternMode = isPatternMode(matchMode);
 
-        Map<String, Object> sourceNode = buildSourceNode(content.getSource(), sourceTables, runtimeContext);
-        Map<String, Object> sinkNode = buildSinkNode(content.getTarget(), sinkTables, runtimeContext);
+        /*
+         * 正则匹配 / 整库同步不再提前解析所有表。
+         *
+         * mode = 2: MySQL-CDC source 使用 table-pattern
+         * mode = 4: MySQL-CDC source 使用 table-pattern = db\..*
+         *
+         * 自定义 / 精准匹配仍然走 tableMatchResolver，生成 table-names。
+         */
+        List<String> sourceTables = patternMode
+                ? Collections.emptyList()
+                : tableMatchResolver.resolveSourceTables(content);
+
+        List<String> sinkTables = patternMode
+                ? Collections.emptyList()
+                : tableMatchResolver.resolveSinkTables(content);
+
+        validateTables(tableMatch, sourceTables, sinkTables);
+
+        Map<String, Object> sourceNode = buildSourceNode(
+                content.getSource(),
+                tableMatch,
+                sourceTables,
+                runtimeContext);
+
+        Map<String, Object> sinkNode = buildSinkNode(
+                content.getTarget(),
+                tableMatch,
+                sinkTables,
+                runtimeContext);
 
         Map<String, Object> edge = new LinkedHashMap<>();
         edge.put("id", EDGE_ID);
@@ -86,10 +124,15 @@ public class GuideMultiHoconBuildService {
 
     private Map<String, Object> buildSourceNode(
             GuideMultiJobContent.WorkflowSourceConfig source,
+            GuideMultiJobContent.TableMatchConfig tableMatch,
             List<String> sourceTables,
             JobRuntimeContext runtimeContext) {
 
-        boolean multiTable = sourceTables.size() > 1;
+        String matchMode = resolveMatchMode(tableMatch);
+        String keyword = resolveKeyword(tableMatch);
+        boolean patternMode = isPatternMode(matchMode);
+
+        boolean multiTable = patternMode || sourceTables.size() > 1;
         String firstSourceTable = firstTable(sourceTables);
 
         Map<String, Object> config = new LinkedHashMap<>();
@@ -100,12 +143,41 @@ public class GuideMultiHoconBuildService {
         putIfNotBlank(config, "pluginName", source.getPluginName());
 
         config.put("readMode", "table");
-        config.put("table", firstSourceTable);
-        config.put("table_path", firstSourceTable);
+
+        /*
+         * 正则匹配 / 整库同步不需要 table / table_path。
+         * 否则后面的 CDC resolver 容易误判成单表或多表列表模式。
+         */
+        if (!patternMode) {
+            putIfNotBlank(config, "table", firstSourceTable);
+            putIfNotBlank(config, "table_path", firstSourceTable);
+        }
 
         config.put(KEY_MULTI_TABLE, multiTable);
-        config.put(KEY_TABLE_LIST, sourceTables);
-        config.put(KEY_SOURCE_TABLE_LIST, sourceTables);
+
+        putIfNotBlank(config, KEY_MATCH_MODE, matchMode);
+        putIfNotBlank(config, KEY_MATCH_MODE_UNDERLINE, matchMode);
+
+        /*
+         * mode = 2 正则匹配：
+         * 把前端输入的 keyword 透传给 CDC resolver。
+         *
+         * MultiTableCdcTableOptionResolver 里根据 matchMode=2
+         * 生成 SeaTunnel CDC 原生 table-pattern。
+         */
+        if (MATCH_MODE_REGEX.equals(matchMode)) {
+            putIfNotBlank(config, KEY_SOURCE_TABLE, keyword);
+            putIfNotBlank(config, KEY_TABLE_KEYWORD, keyword);
+        }
+
+        /*
+         * 自定义 / 精准匹配才需要 table list。
+         * 正则 / 整库同步不要塞 source_table_list，避免后续又生成 table-names。
+         */
+        if (!patternMode) {
+            putListIfNotEmpty(config, KEY_TABLE_LIST, sourceTables);
+            putListIfNotEmpty(config, KEY_SOURCE_TABLE_LIST, sourceTables);
+        }
 
         appendRuntimeConfig(config, runtimeContext);
 
@@ -144,10 +216,14 @@ public class GuideMultiHoconBuildService {
 
     private Map<String, Object> buildSinkNode(
             GuideMultiJobContent.WorkflowTargetConfig target,
+            GuideMultiJobContent.TableMatchConfig tableMatch,
             List<String> sinkTables,
             JobRuntimeContext runtimeContext) {
 
-        boolean multiTable = sinkTables.size() > 1;
+        String matchMode = resolveMatchMode(tableMatch);
+        boolean patternMode = isPatternMode(matchMode);
+
+        boolean multiTable = patternMode || sinkTables.size() > 1;
         String firstSinkTable = firstTable(sinkTables);
 
         Map<String, Object> config = new LinkedHashMap<>();
@@ -158,15 +234,25 @@ public class GuideMultiHoconBuildService {
         putIfNotBlank(config, "pluginName", target.getPluginName());
 
         config.put(KEY_MULTI_TABLE, multiTable);
-        config.put(KEY_TABLE_LIST, sinkTables);
-        config.put(KEY_SINK_TABLE_LIST, sinkTables);
 
+        putIfNotBlank(config, KEY_MATCH_MODE, matchMode);
+        putIfNotBlank(config, KEY_MATCH_MODE_UNDERLINE, matchMode);
+
+        if (!patternMode) {
+            putListIfNotEmpty(config, KEY_TABLE_LIST, sinkTables);
+            putListIfNotEmpty(config, KEY_SINK_TABLE_LIST, sinkTables);
+        }
+
+        /*
+         * 多表 / 正则 / 整库同步统一走动态表名。
+         * Source CDC 会带出 table_name，Sink 使用 ${table_name} 自动写入对应表。
+         */
         if (multiTable) {
             config.put(KEY_TABLE_PATTERN, "${table_name}");
         } else {
-            config.put("table", firstSinkTable);
-            config.put("table_path", firstSinkTable);
-            config.put("targetTableName", firstSinkTable);
+            putIfNotBlank(config, "table", firstSinkTable);
+            putIfNotBlank(config, "table_path", firstSinkTable);
+            putIfNotBlank(config, "targetTableName", firstSinkTable);
         }
 
         appendRuntimeConfig(config, runtimeContext);
@@ -217,18 +303,18 @@ public class GuideMultiHoconBuildService {
         }
 
         JobEnvConfig env = runtimeContext.getEnv();
-        if (env != null) {
-            if (env.getJobMode() != null) {
-                target.put("jobMode", env.getJobMode().name());
-                target.put("job_mode", env.getJobMode().name());
-            }
-
-            if (env.getParallelism() != null) {
-                target.put("parallelism", env.getParallelism());
-            }
+        if (env == null) {
+            return;
         }
 
+        if (env.getJobMode() != null) {
+            target.put("jobMode", env.getJobMode().name());
+            target.put("job_mode", env.getJobMode().name());
+        }
 
+        if (env.getParallelism() != null) {
+            target.put("parallelism", env.getParallelism());
+        }
     }
 
     private void validateContent(GuideMultiJobContent content) {
@@ -288,7 +374,35 @@ public class GuideMultiHoconBuildService {
         }
     }
 
-    private void validateTables(List<String> sourceTables, List<String> sinkTables) {
+    private void validateTables(
+            GuideMultiJobContent.TableMatchConfig tableMatch,
+            List<String> sourceTables,
+            List<String> sinkTables) {
+
+        String matchMode = resolveMatchMode(tableMatch);
+
+        /*
+         * 正则匹配：只校验 keyword。
+         * 不要求提前解析出所有表。
+         */
+        if (MATCH_MODE_REGEX.equals(matchMode)) {
+            if (StringUtils.isBlank(resolveKeyword(tableMatch))) {
+                throw new IllegalArgumentException("table match keyword can not be blank when match mode is regex");
+            }
+            return;
+        }
+
+        /*
+         * 整库同步：直接交给 CDC table-pattern = db\..*
+         * 不要求 sourceTables / sinkTables。
+         */
+        if (MATCH_MODE_WHOLE_DATABASE.equals(matchMode)) {
+            return;
+        }
+
+        /*
+         * 自定义 / 精准匹配：仍然需要明确的表列表。
+         */
         if (CollectionUtils.isEmpty(sourceTables)) {
             throw new IllegalArgumentException("source tables can not be empty");
         }
@@ -300,6 +414,45 @@ public class GuideMultiHoconBuildService {
         if (sourceTables.size() != sinkTables.size()) {
             throw new IllegalArgumentException("source tables and sink tables size must be equal");
         }
+    }
+
+    private String resolveMatchMode(GuideMultiJobContent.TableMatchConfig tableMatch) {
+        if (tableMatch == null || tableMatch.getMode() == null) {
+            return MATCH_MODE_CUSTOM;
+        }
+
+        String mode = String.valueOf(tableMatch.getMode()).trim();
+
+        if (MATCH_MODE_CUSTOM.equals(mode)) {
+            return MATCH_MODE_CUSTOM;
+        }
+
+        if (MATCH_MODE_REGEX.equals(mode)) {
+            return MATCH_MODE_REGEX;
+        }
+
+        if (MATCH_MODE_EXACT.equals(mode)) {
+            return MATCH_MODE_EXACT;
+        }
+
+        if (MATCH_MODE_WHOLE_DATABASE.equals(mode)) {
+            return MATCH_MODE_WHOLE_DATABASE;
+        }
+
+        return mode;
+    }
+
+    private String resolveKeyword(GuideMultiJobContent.TableMatchConfig tableMatch) {
+        if (tableMatch == null) {
+            return null;
+        }
+
+        return StringUtils.trimToNull(tableMatch.getKeyword());
+    }
+
+    private boolean isPatternMode(String matchMode) {
+        return MATCH_MODE_REGEX.equals(matchMode)
+                || MATCH_MODE_WHOLE_DATABASE.equals(matchMode);
     }
 
     private String firstTable(List<String> tables) {
@@ -319,6 +472,12 @@ public class GuideMultiHoconBuildService {
     private void putIfNotBlank(Map<String, Object> map, String key, String value) {
         if (StringUtils.isNotBlank(value)) {
             map.put(key, value.trim());
+        }
+    }
+
+    private void putListIfNotEmpty(Map<String, Object> map, String key, List<String> values) {
+        if (CollectionUtils.isNotEmpty(values)) {
+            map.put(key, values);
         }
     }
 
