@@ -55,14 +55,20 @@ public class DataSourceServiceImpl extends BaseServiceImpl implements DataSource
         validateCreateRequest(dto);
 
         try {
-            ConnectionParam connectionParam =
+            BaseConnectionParam connectionParam =
                     DataSourceUtils.buildConnectionParams(dto.getDbType(), dto.getConnectionParams());
+
+            DataSourceUtils.checkDatasourceParam(connectionParam);
+
+            checkConnection(dto.getDbType(), connectionParam);
 
             DataSource entity = ConvertUtil.sourceToTarget(dto, DataSource.class);
             entity.setName(dto.getName().trim());
             entity.setConnectionParams(JSONUtils.toJsonString(connectionParam));
             entity.setOriginalJson(dto.getConnectionParams());
-            entity.setConnStatus(ConnStatus.CONNECTED_NONE);
+
+            entity.setConnStatus(ConnStatus.CONNECTED_SUCCESS);
+
             entity.initInsert();
 
             dataSourceDao.insert(entity);
