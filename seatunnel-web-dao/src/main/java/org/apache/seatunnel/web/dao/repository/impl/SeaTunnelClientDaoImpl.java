@@ -1,5 +1,7 @@
 package org.apache.seatunnel.web.dao.repository.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.annotation.Resource;
 import lombok.NonNull;
 import org.apache.seatunnel.web.dao.entity.SeaTunnelClient;
@@ -7,6 +9,10 @@ import org.apache.seatunnel.web.dao.mapper.SeaTunnelClientMapper;
 import org.apache.seatunnel.web.dao.repository.BaseDao;
 import org.apache.seatunnel.web.dao.repository.SeaTunnelClientDao;
 import org.springframework.stereotype.Repository;
+
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
 
 @Repository
 public class SeaTunnelClientDaoImpl
@@ -16,13 +22,42 @@ public class SeaTunnelClientDaoImpl
     @Resource
     private SeaTunnelClientMapper seaTunnelClientMapper;
 
-    public SeaTunnelClientDaoImpl(@NonNull SeaTunnelClientMapper SeaTunnelClientMapper) {
-        super(SeaTunnelClientMapper);
+    public SeaTunnelClientDaoImpl(@NonNull SeaTunnelClientMapper seaTunnelClientMapper) {
+        super(seaTunnelClientMapper);
     }
-
 
     @Override
     public SeaTunnelClient selectById(Long clientId) {
         return seaTunnelClientMapper.selectById(clientId);
+    }
+
+    @Override
+    public List<SeaTunnelClient> listProbeClients() {
+        LambdaQueryWrapper<SeaTunnelClient> wrapper = new LambdaQueryWrapper<>();
+        wrapper.isNotNull(SeaTunnelClient::getId)
+                .isNotNull(SeaTunnelClient::getBaseUrl)
+                .ne(SeaTunnelClient::getBaseUrl, "")
+                .orderByDesc(SeaTunnelClient::getCreateTime);
+
+        List<SeaTunnelClient> records = seaTunnelClientMapper.selectList(wrapper);
+        return records == null ? Collections.emptyList() : records;
+    }
+
+    @Override
+    public int updateHealthStatus(Long clientId, Integer healthStatus, Date heartbeatTime) {
+        if (clientId == null || clientId <= 0 || healthStatus == null) {
+            return 0;
+        }
+
+        LambdaUpdateWrapper<SeaTunnelClient> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(SeaTunnelClient::getId, clientId)
+                .set(SeaTunnelClient::getHealthStatus, healthStatus)
+                .set(SeaTunnelClient::getUpdateTime, new Date());
+
+        if (heartbeatTime != null) {
+            wrapper.set(SeaTunnelClient::getHeartbeatTime, heartbeatTime);
+        }
+
+        return seaTunnelClientMapper.update(null, wrapper);
     }
 }

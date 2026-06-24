@@ -19,6 +19,10 @@ public interface StreamingJobInstanceDao extends IDao<StreamingJobInstance> {
 
     void deleteByDefinitionId(Long definitionId);
 
+    int failRunningInstancesByClientId(Long clientId, String errorMessage);
+
+    List<StreamingJobInstance> listRunningLikeInstances();
+
     void updateStatus(Long instanceId, JobStatus status, String errorMessage);
 
     void updateStatusAndEngineId(Long instanceId, JobStatus status, Long engineJobId);

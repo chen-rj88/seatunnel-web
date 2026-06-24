@@ -277,7 +277,6 @@ export function useCustomWorkflowState({
       setPreviewOpen(true);
     } catch (error: any) {
       console.error(error);
-      message.error(error?.message || "预览失败");
     } finally {
       setPreviewLoading(false);
     }

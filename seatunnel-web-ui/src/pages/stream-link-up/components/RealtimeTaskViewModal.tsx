@@ -558,7 +558,7 @@ const RealtimeGrafanaLightModal = forwardRef<
                     </ChartOrEmpty>
                   </LightPanel>
 
-                  <LightPanel
+                  {/* <LightPanel
                     className="col-span-12 xl:col-span-5"
                     title="Basic Info"
                     description="Source / Sink"
@@ -573,10 +573,10 @@ const RealtimeGrafanaLightModal = forwardRef<
                       />
                       <BasicRow label="Job Status" value={viewData.status} />
                     </div>
-                  </LightPanel>
+                  </LightPanel> */}
 
                   <LightPanel
-                    className="col-span-12 xl:col-span-7"
+                    className="col-span-12 xl:col-span-12"
                     title="Table Metrics"
                     description="Table level read/write progress"
                   >

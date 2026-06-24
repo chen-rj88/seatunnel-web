@@ -109,3 +109,16 @@ seatunnel:
       log-every-times: 10
       retention-days: 7
       retention-cron: "0 20 3 * * ?"
+
+  client:
+    health-check:
+      enabled: true
+      initial-delay-ms: 15000
+      fixed-delay-ms: 30000
+      unhealthy-threshold: 3
+
+  job:
+    recovery:
+      enabled: true
+      initial-delay-ms: 60000
+      fixed-delay-ms: 60000

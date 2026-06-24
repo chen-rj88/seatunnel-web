@@ -115,6 +115,116 @@ public class JobMetricsMonitor {
                 instanceId, context.getEngineId());
     }
 
+    public void finalizeAndPersist(Long instanceId, String finalStatus) {
+        JobRuntimeContext context = monitoringJobs.get(instanceId);
+
+        if (context == null) {
+            log.warn("Metrics monitor context not found when finalizing, instanceId={}", instanceId);
+            cleanup(instanceId);
+            return;
+        }
+
+        finalizeAndPersist(context, finalStatus);
+    }
+
+    /**
+     * Finalize metrics with explicit runtime context.
+     *
+     * <p>
+     * This method is mainly used by recovery logic after SeaTunnel Web restart.
+     * Because monitoringJobs is an in-memory map, it will be empty after restart.
+     * Recovery should rebuild JobRuntimeContext from persisted job instance data
+     * and call this method directly.
+     * </p>
+     */
+    public void finalizeAndPersist(JobRuntimeContext context, String finalStatus) {
+        if (context == null) {
+            log.warn("Skip finalizing metrics because context is null");
+            return;
+        }
+
+        Long instanceId = context.getInstanceId();
+
+        if (instanceId == null || instanceId <= 0) {
+            log.warn("Skip finalizing metrics because instanceId is invalid, context={}", context);
+            return;
+        }
+
+        if (context.getClientId() == null || context.getClientId() <= 0) {
+            log.warn("Skip finalizing metrics because clientId is invalid, instanceId={}", instanceId);
+            cleanup(instanceId);
+            return;
+        }
+
+        if (context.getEngineId() == null || context.getEngineId() <= 0) {
+            log.warn("Skip finalizing metrics because engineId is invalid, instanceId={}", instanceId);
+            cleanup(instanceId);
+            return;
+        }
+
+        try {
+            ParsedJobMetrics parsed = metricsService.getJobMetricsFromEngine(
+                    context.getClientId(),
+                    context.getEngineId()
+            );
+
+            if (parsed != null && !parsed.isEmpty()) {
+                attachContext(instanceId, context, parsed);
+
+                JobFileLogger logger = getOrCreateLogger(instanceId);
+                if (logger != null) {
+                    logger.info("Final Metrics Snapshot:");
+                    logger.info(formatMetrics(parsed));
+                }
+
+                if (parsed.getPipelineMetrics() != null) {
+                    persistPipelineMetrics(parsed.getPipelineMetrics().values());
+                }
+
+                persistTableMetrics(parsed.getTableMetrics());
+
+                log.info(
+                        "Final metrics persisted, instanceId={}, pipelineCount={}, tableCount={}",
+                        instanceId,
+                        parsed.getPipelineMetrics() == null ? 0 : parsed.getPipelineMetrics().size(),
+                        parsed.getTableMetrics() == null ? 0 : parsed.getTableMetrics().size()
+                );
+            } else {
+                log.warn("Final metrics is empty, instanceId={}, engineId={}",
+                        instanceId, context.getEngineId());
+            }
+
+            sendFinalEvent(instanceId, context.getEngineId(), finalStatus);
+        } catch (Exception e) {
+            log.warn("Failed to finalize metrics, instanceId={}, engineId={}",
+                    instanceId, context.getEngineId(), e);
+            sendFinalEvent(instanceId, context.getEngineId(), "FAILED");
+        } finally {
+            cleanup(instanceId);
+        }
+    }
+
+    private JobFileLogger getOrCreateLogger(Long instanceId) {
+        JobFileLogger logger = loggers.get(instanceId);
+        if (logger != null) {
+            return logger;
+        }
+
+        try {
+            String logPath = instanceService.selectById(instanceId).getLogPath();
+            if (logPath == null || logPath.trim().isEmpty()) {
+                return null;
+            }
+
+            JobFileLogger newLogger = new JobFileLogger(logPath);
+            loggers.put(instanceId, newLogger);
+            return newLogger;
+        } catch (Exception e) {
+            log.warn("Failed to create job file logger when finalizing, instanceId={}", instanceId, e);
+            return null;
+        }
+    }
+
     @Scheduled(fixedDelayString = "${seatunnel.metrics.interval-ms:2000}")
     public void reportAllWebSocket() {
         if (monitoringJobs.isEmpty()) {
@@ -333,50 +443,6 @@ public class JobMetricsMonitor {
         finalizeAndPersist(instanceId, "FINISHED");
     }
 
-    public void finalizeAndPersist(Long instanceId, String finalStatus) {
-        JobRuntimeContext context = monitoringJobs.get(instanceId);
-
-        if (context == null) {
-            log.warn("Metrics monitor context not found when finalizing, instanceId={}", instanceId);
-            cleanup(instanceId);
-            return;
-        }
-
-        try {
-            ParsedJobMetrics parsed = metricsService.getJobMetricsFromEngine(
-                    context.getClientId(),
-                    context.getEngineId()
-            );
-
-            if (parsed != null && !parsed.isEmpty()) {
-                attachContext(instanceId, context, parsed);
-
-                JobFileLogger logger = loggers.get(instanceId);
-                if (logger != null) {
-                    logger.info("Final Metrics Snapshot:");
-                    logger.info(formatMetrics(parsed));
-                }
-
-                if (parsed.getPipelineMetrics() != null) {
-                    persistPipelineMetrics(parsed.getPipelineMetrics().values());
-                }
-
-                persistTableMetrics(parsed.getTableMetrics());
-
-                log.info("Final metrics persisted, instanceId={}, pipelineCount={}, tableCount={}",
-                        instanceId,
-                        parsed.getPipelineMetrics() == null ? 0 : parsed.getPipelineMetrics().size(),
-                        parsed.getTableMetrics() == null ? 0 : parsed.getTableMetrics().size());
-            }
-
-            sendFinalEvent(instanceId, context.getEngineId(), finalStatus);
-        } catch (Exception e) {
-            log.warn("Failed to finalize metrics, instanceId={}", instanceId, e);
-            sendFinalEvent(instanceId, context.getEngineId(), "FAILED");
-        } finally {
-            cleanup(instanceId);
-        }
-    }
 
     private void attachContext(Long instanceId,
                                JobRuntimeContext context,

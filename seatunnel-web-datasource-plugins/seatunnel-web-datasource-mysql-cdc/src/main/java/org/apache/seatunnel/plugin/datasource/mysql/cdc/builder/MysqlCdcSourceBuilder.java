@@ -16,14 +16,12 @@ public class MysqlCdcSourceBuilder extends AbstractCdcSourceBuilder {
     public String sourceTemplate() {
         return ""
                 + "  MySQL-CDC {\n"
-                + "    url = \"jdbc:mysql://127.0.0.1:3306\"\n"
-                + "    username = \"root\"\n"
-                + "    password = \"******\"\n"
+                + "    datasourceId = @\n"
                 + "    database-names = [\"demo\"]\n"
                 + "    table-names = [\"demo.user\"]\n"
                 + "    server-id = \"5400-5408\"\n"
                 + "    server-time-zone = \"Asia/Shanghai\"\n"
-                + "    startup.mode = \"initial\"AbstractCdcSourceBuilder\n"
+                + "    startup.mode = \"initial\"\n"
                 + "  }\n";
     }
 }

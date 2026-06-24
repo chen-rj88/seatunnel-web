@@ -9,6 +9,7 @@ import lombok.NonNull;
 import org.apache.seatunnel.web.common.enums.JobMode;
 import org.apache.seatunnel.web.common.enums.JobStatus;
 import org.apache.seatunnel.web.common.utils.ConvertUtil;
+import org.apache.seatunnel.web.common.utils.JobStatusHelper;
 import org.apache.seatunnel.web.dao.entity.JobInstance;
 import org.apache.seatunnel.web.dao.mapper.JobInstanceMapper;
 import org.apache.seatunnel.web.dao.repository.BaseDao;
@@ -44,6 +45,25 @@ public class JobInstanceDaoImpl
     }
 
     @Override
+    public int failRunningInstancesByClientId(Long clientId, String errorMessage) {
+        if (clientId == null || clientId <= 0) {
+            return 0;
+        }
+
+        Date now = new Date();
+
+        LambdaUpdateWrapper<JobInstance> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(JobInstance::getClientId, clientId)
+                .in(JobInstance::getJobStatus, JobStatusHelper.runningLikeStatuses())
+                .set(JobInstance::getJobStatus, JobStatus.FAILED)
+                .set(JobInstance::getErrorMessage, truncate(errorMessage, 2000))
+                .set(JobInstance::getEndTime, now)
+                .set(JobInstance::getUpdateTime, now);
+
+        return jobInstanceMapper.update(null, wrapper);
+    }
+
+    @Override
     public JobInstanceVO selectDetailById(Long id) {
         if (id == null || id <= 0) {
             return null;
@@ -75,6 +95,24 @@ public class JobInstanceDaoImpl
         LambdaQueryWrapper<JobInstance> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(JobInstance::getJobDefinitionId, definitionId);
         jobInstanceMapper.delete(wrapper);
+    }
+
+    @Override
+    public List<JobInstance> listRunningLikeInstances() {
+        LambdaQueryWrapper<JobInstance> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(JobInstance::getJobStatus,
+                JobStatus.INITIALIZING,
+                JobStatus.CREATED,
+                JobStatus.PENDING,
+                JobStatus.SCHEDULED,
+                JobStatus.RUNNING,
+                JobStatus.FAILING,
+                JobStatus.DOING_SAVEPOINT,
+                JobStatus.CANCELING)
+                .orderByDesc(JobInstance::getCreateTime);
+
+        List<JobInstance> records = jobInstanceMapper.selectList(wrapper);
+        return records == null ? Collections.emptyList() : records;
     }
 
     @Override

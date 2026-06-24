@@ -20,6 +20,10 @@ public interface JobInstanceDao extends IDao<JobInstance> {
 
     void deleteByDefinitionId(Long definitionId);
 
+    List<JobInstance> listRunningLikeInstances();
+
+    int failRunningInstancesByClientId(Long clientId, String errorMessage);
+
     void updateStatus(Long instanceId, JobStatus status, String errorMessage);
 
     void updateStatusAndEngineId(Long instanceId, JobStatus status, String engineJobId);
