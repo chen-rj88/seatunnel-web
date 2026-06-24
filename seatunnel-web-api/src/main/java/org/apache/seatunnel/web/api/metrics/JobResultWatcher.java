@@ -2,7 +2,7 @@ package org.apache.seatunnel.web.api.metrics;
 
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.seatunnel.web.common.enums.JobResult;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.web.common.enums.JobStatus;
 import org.apache.seatunnel.web.engine.client.rest.SeaTunnelRestClient;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,16 +13,19 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Watch SeaTunnel job result by REST polling.
+ * Watch SeaTunnel batch job result by REST polling.
+ *
+ * <p>
+ * This watcher only detects the final Zeta job status.
+ * Local status update and final metrics persistence are delegated to
+ * JobResultHandler.
+ * </p>
  */
 @Component
 @Slf4j
 public class JobResultWatcher {
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
-
-    @Resource
-    private JobMetricsMonitor metricsMonitor;
 
     @Resource
     private JobResultHandler resultHandler;
@@ -36,30 +39,59 @@ public class JobResultWatcher {
     @Value("${seatunnel.result.poll-timeout-ms:0}")
     private long pollTimeoutMs;
 
-    public void registerByRest(JobRuntimeContext context) {
-        executor.submit(() -> watch(context));
+    public void registerByRest(final JobRuntimeContext context) {
+        if (context == null) {
+            log.warn("Skip registering REST job result watcher because context is null");
+            return;
+        }
+
+        executor.submit(new Runnable() {
+            @Override
+            public void run() {
+                watch(context);
+            }
+        });
     }
 
     private void watch(JobRuntimeContext context) {
         long start = System.currentTimeMillis();
 
         Long instanceId = context.getInstanceId();
+        Long clientId = context.getClientId();
         Long engineId = context.getEngineId();
 
         try {
+            validateContext(context);
+
             while (true) {
                 checkTimeout(start, engineId);
 
-                Map jobInfo = seatunnelRestClient.jobInfo(context.getClientId(), engineId);
+                Map jobInfo = seatunnelRestClient.jobInfo(clientId, engineId);
                 String statusStr = readStatus(jobInfo);
 
-                if (statusStr == null) {
-                    log.warn("job-info returned no status, engineId={}, resp={}", engineId, jobInfo);
+                if (StringUtils.isBlank(statusStr)) {
+                    log.warn(
+                            "Zeta job-info returned no status, instanceId={}, clientId={}, engineId={}, resp={}",
+                            instanceId,
+                            clientId,
+                            engineId,
+                            jobInfo
+                    );
+
                     sleepQuietly();
                     continue;
                 }
 
                 JobStatus status = parseJobStatus(statusStr);
+
+                log.debug(
+                        "Polling Zeta job status, instanceId={}, clientId={}, engineId={}, engineStatus={}, localStatus={}",
+                        instanceId,
+                        clientId,
+                        engineId,
+                        statusStr,
+                        status
+                );
 
                 if (!status.isEndState()) {
                     sleepQuietly();
@@ -67,40 +99,62 @@ public class JobResultWatcher {
                 }
 
                 handleFinalStatus(instanceId, status, jobInfo);
-
                 return;
             }
-        } catch (Exception e) {
-            log.warn("REST job result watcher failed, instanceId={}, engineId={}",
-                    instanceId, engineId, e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+
+            log.warn(
+                    "REST job result watcher interrupted, instanceId={}, clientId={}, engineId={}",
+                    instanceId,
+                    clientId,
+                    engineId,
+                    e
+            );
 
             resultHandler.handleFailure(instanceId, e);
+        } catch (Exception e) {
+            log.warn(
+                    "REST job result watcher failed, instanceId={}, clientId={}, engineId={}",
+                    instanceId,
+                    clientId,
+                    engineId,
+                    e
+            );
 
-            try {
-                metricsMonitor.finalizeAndPersist(instanceId, "FAILED");
-            } catch (Exception ignored) {
-            }
+            resultHandler.handleFailure(instanceId, e);
         } finally {
-            log.info("REST job result watcher finished, instanceId={}, engineId={}",
-                    instanceId, engineId);
+            log.info(
+                    "REST job result watcher finished, instanceId={}, clientId={}, engineId={}",
+                    instanceId,
+                    clientId,
+                    engineId
+            );
         }
     }
 
     private void handleFinalStatus(Long instanceId,
                                    JobStatus status,
                                    Map jobInfo) {
-        if (status == JobStatus.FINISHED) {
-            resultHandler.handleSuccess(instanceId);
-            metricsMonitor.finalizeAndPersist(instanceId, "FINISHED");
-            return;
+        String errorMessage = JobStatus.FINISHED.equals(status)
+                ? null
+                : readErrorMsg(jobInfo);
+
+        resultHandler.handleFinalStatus(instanceId, status, errorMessage);
+    }
+
+    private void validateContext(JobRuntimeContext context) {
+        if (context.getInstanceId() == null || context.getInstanceId() <= 0) {
+            throw new IllegalArgumentException("instanceId must not be null");
         }
 
-        JobResult jr = new JobResult(JobStatus.FAILED);
-        jr.setStatus(status);
-        jr.setError(readErrorMsg(jobInfo));
+        if (context.getClientId() == null || context.getClientId() <= 0) {
+            throw new IllegalArgumentException("clientId must not be null");
+        }
 
-        resultHandler.handleFailure(instanceId, jr);
-        metricsMonitor.finalizeAndPersist(instanceId, status.name());
+        if (context.getEngineId() == null || context.getEngineId() <= 0) {
+            throw new IllegalArgumentException("engineId must not be null");
+        }
     }
 
     private void checkTimeout(long start, Long engineId) {
@@ -115,30 +169,68 @@ public class JobResultWatcher {
     }
 
     private String readStatus(Map jobInfo) {
-        if (jobInfo == null) {
+        if (jobInfo == null || jobInfo.isEmpty()) {
             return null;
         }
 
-        Object status = jobInfo.get("jobStatus");
+        Object status = firstNonNull(
+                jobInfo.get("jobStatus"),
+                jobInfo.get("job_status"),
+                jobInfo.get("status"),
+                jobInfo.get("state"),
+                jobInfo.get("jobState")
+        );
+
         if (status == null) {
             return null;
         }
 
         String value = String.valueOf(status);
-        if (value.trim().isEmpty() || "null".equalsIgnoreCase(value)) {
+        if (StringUtils.isBlank(value) || "null".equalsIgnoreCase(value.trim())) {
             return null;
         }
 
-        return value;
+        return value.trim();
     }
 
     private String readErrorMsg(Map jobInfo) {
-        if (jobInfo == null) {
+        if (jobInfo == null || jobInfo.isEmpty()) {
             return null;
         }
 
-        Object errorMsg = jobInfo.get("errorMsg");
-        return errorMsg == null ? null : String.valueOf(errorMsg);
+        Object errorMsg = firstNonNull(
+                jobInfo.get("errorMsg"),
+                jobInfo.get("error_msg"),
+                jobInfo.get("errorMessage"),
+                jobInfo.get("message"),
+                jobInfo.get("exception"),
+                jobInfo.get("cause")
+        );
+
+        if (errorMsg == null) {
+            return null;
+        }
+
+        String value = String.valueOf(errorMsg);
+        if (StringUtils.isBlank(value) || "null".equalsIgnoreCase(value.trim())) {
+            return null;
+        }
+
+        return value.trim();
+    }
+
+    private Object firstNonNull(Object... values) {
+        if (values == null) {
+            return null;
+        }
+
+        for (Object value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+
+        return null;
     }
 
     private void sleepQuietly() throws InterruptedException {
@@ -146,13 +238,31 @@ public class JobResultWatcher {
     }
 
     private JobStatus parseJobStatus(String value) {
-        try {
-            return JobStatus.valueOf(value);
-        } catch (Exception e) {
-            if ("CANCELLED".equalsIgnoreCase(value)) {
-                return JobStatus.CANCELED;
-            }
+        if (StringUtils.isBlank(value)) {
+            return JobStatus.UNKNOWABLE;
+        }
 
+        String normalized = value.trim().toUpperCase();
+
+        if ("SUCCESS".equals(normalized)
+                || "SUCCEEDED".equals(normalized)
+                || "DONE".equals(normalized)) {
+            return JobStatus.FINISHED;
+        }
+
+        if ("FAILURE".equals(normalized)) {
+            return JobStatus.FAILED;
+        }
+
+        if ("CANCELLED".equals(normalized)
+                || "STOPPED".equals(normalized)) {
+            return JobStatus.CANCELED;
+        }
+
+        try {
+            return JobStatus.valueOf(normalized);
+        } catch (Exception e) {
+            log.warn("Unknown Zeta job status: {}", value);
             return JobStatus.UNKNOWABLE;
         }
     }

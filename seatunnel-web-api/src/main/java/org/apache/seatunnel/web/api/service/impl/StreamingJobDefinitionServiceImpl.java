@@ -139,7 +139,7 @@ public class StreamingJobDefinitionServiceImpl extends BaseServiceImpl implement
             throw e;
         } catch (Exception e) {
             log.error("Build streaming hocon config failed, command={}", command, e);
-            throw new ServiceException(Status.BUILD_BATCH_JOB_HOCON_CONFIG_ERROR);
+            throw new ServiceException(e.getMessage());
         }
     }
 

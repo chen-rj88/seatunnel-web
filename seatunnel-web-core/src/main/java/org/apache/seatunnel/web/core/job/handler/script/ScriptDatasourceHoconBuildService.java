@@ -135,7 +135,7 @@ public class ScriptDatasourceHoconBuildService {
 
     /**
      * This is the core datasourceId replacement logic.
-     *
+     * <p>
      * Web-side fields such as datasourceId/dbType/pluginName are only used
      * for finding datasource and selecting builder. They should not appear
      * in the final SeaTunnel HOCON.
@@ -270,7 +270,11 @@ public class ScriptDatasourceHoconBuildService {
     }
 
     private String buildBuilderName(PluginConfig plugin, DbType dbType) {
-        return (plugin.getPluginName() + "-" + dbType).toUpperCase();
+        if (plugin.getPluginName().equalsIgnoreCase("Jdbc")) {
+            return (plugin.getPluginName() + "-" + dbType).toUpperCase();
+        } else {
+            return plugin.getPluginName();
+        }
     }
 
     private String safeGetString(Config config, String path) {
