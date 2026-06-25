@@ -1,35 +1,24 @@
-import React, { useEffect, useMemo, useState } from "react";
+import * as echarts from "echarts";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Card, Empty, Spin, Table, Tag, Tooltip, message } from "antd";
 import { useIntl } from "@umijs/max";
-import CountUp from "react-countup";
 import {
-  ArrowDownToLine,
   ArrowRight,
-  ArrowUpFromLine,
-  Database,
   Gauge,
   Layers3,
   Table2,
-  TrendingUp,
 } from "lucide-react";
-
 
 interface MetricsTabProps {
   instanceItem: any;
 }
 
-interface SparkLineProps {
-  data: number[];
-}
-
-interface MetricCardProps {
-  title: string;
-  value: number;
-  unit: string;
-  hint: string;
-  icon: React.ReactNode;
-  accentClassName: string;
-  trendData: number[];
+interface FlowMetricPoint {
+  name: string;
+  readQps: number;
+  writeQps: number;
+  readRows: number;
+  writeRows: number;
 }
 
 const toNumber = (value: any) => {
@@ -54,6 +43,24 @@ const formatDecimal = (value: any) => {
   }
 
   return n.toFixed(2).replace(/\.?0+$/, "");
+};
+
+const formatCompactNumber = (value: any) => {
+  const n = toNumber(value);
+
+  if (n >= 100000000) {
+    return `${(n / 100000000).toFixed(1).replace(/\.0$/, "")}亿`;
+  }
+
+  if (n >= 10000) {
+    return `${(n / 10000).toFixed(1).replace(/\.0$/, "")}万`;
+  }
+
+  if (n >= 1000) {
+    return `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+  }
+
+  return `${n}`;
 };
 
 const getShortTableName = (table?: string) => {
@@ -102,111 +109,6 @@ const getStatusMeta = (status?: string) => {
   };
 };
 
-const getResponseData = (res: any) => {
-  if (!res) {
-    return [];
-  }
-
-  if (Array.isArray(res)) {
-    return res;
-  }
-
-  if (Array.isArray(res.data)) {
-    return res.data;
-  }
-
-  if (Array.isArray(res?.data?.data)) {
-    return res.data.data;
-  }
-
-  return [];
-};
-
-const SparkLine: React.FC<SparkLineProps> = ({ data }) => {
-  const safeData = data.length > 1 ? data : [0, 0];
-  const max = Math.max(...safeData, 1);
-  const min = Math.min(...safeData, 0);
-  const range = Math.max(max - min, 1);
-
-  const points = safeData
-    .map((value, index) => {
-      const x = (index / (safeData.length - 1)) * 100;
-      const y = 34 - ((value - min) / range) * 28;
-      return `${x},${y}`;
-    })
-    .join(" ");
-
-  return (
-    <svg
-      width="100%"
-      height="40"
-      viewBox="0 0 100 40"
-      preserveAspectRatio="none"
-      className="overflow-visible"
-    >
-      <polyline
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        points={points}
-      />
-    </svg>
-  );
-};
-
-const MetricCard: React.FC<MetricCardProps> = ({
-  title,
-  value,
-  unit,
-  hint,
-  icon,
-  accentClassName,
-  trendData,
-}) => {
-  return (
-    <div className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition-all duration-200 hover:border-slate-300 hover:shadow-[0_10px_28px_rgba(15,23,42,0.07)]">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
-            {title}
-          </div>
-
-          <div className="mt-3 flex items-end gap-1.5">
-            <span className="text-[28px] font-semibold leading-none tracking-[-0.04em] text-slate-950">
-              <CountUp end={value} duration={1.1} separator="," decimals={0} />
-            </span>
-            <span className="pb-0.5 text-xs font-medium text-slate-400">
-              {unit}
-            </span>
-          </div>
-        </div>
-
-        <div
-          className={[
-            "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border",
-            accentClassName,
-          ].join(" ")}
-        >
-          {icon}
-        </div>
-      </div>
-
-      <div className="mt-4 flex items-end gap-3">
-        <div className={["h-10 flex-1", accentClassName].join(" ")}>
-          <SparkLine data={trendData} />
-        </div>
-
-        <div className="mb-1 inline-flex items-center gap-1 rounded-full bg-slate-50 px-2 py-1 text-[11px] font-medium text-slate-500">
-          <TrendingUp size={12} strokeWidth={1.8} />
-          {hint}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const SectionHeader: React.FC<{
   title: string;
   description: string;
@@ -234,11 +136,287 @@ const SectionHeader: React.FC<{
 const buildTrend = (value: number, seed = 1) => {
   const base = Math.max(value, 1);
 
-  return Array.from({ length: 12 }, (_, index) => {
-    const wave = Math.sin((index + seed) * 0.8) * 0.12;
-    const slope = index * 0.015;
+  return Array.from({ length: 16 }, (_, index) => {
+    const wave = Math.sin((index + seed) * 0.75) * 0.12;
+    const slope = index * 0.012;
     return Math.max(Math.round(base * (0.82 + wave + slope)), 0);
   });
+};
+
+const buildFlowMetricPoints = (instanceItem: any, metrics: any) => {
+  const recentMetrics = Array.isArray(instanceItem?.recentMetrics)
+    ? instanceItem.recentMetrics.slice(-20)
+    : [];
+
+  if (recentMetrics.length > 0) {
+    return recentMetrics.map((item: any, index: number) => ({
+      name:
+        item.date ||
+        item.time ||
+        item.collectTime ||
+        item.createTime ||
+        `采样 ${index + 1}`,
+      readQps: toNumber(item.readQps),
+      writeQps: toNumber(item.writeQps),
+      readRows: toNumber(item.readRowCount),
+      writeRows: toNumber(item.writeRowCount),
+    }));
+  }
+
+  return metrics.readQpsTrend.map((_: any, index: number) => ({
+    name: `T-${metrics.readQpsTrend.length - index}`,
+    readQps: metrics.readQpsTrend[index],
+    writeQps: metrics.writeQpsTrend[index],
+    readRows: metrics.readRowsTrend[index],
+    writeRows: metrics.writeRowsTrend[index],
+  }));
+};
+
+const MetricsFlowChart: React.FC<{ data: FlowMetricPoint[] }> = ({ data }) => {
+  const chartRef = useRef<HTMLDivElement | null>(null);
+  const chartInstanceRef = useRef<echarts.ECharts | null>(null);
+
+  useEffect(() => {
+    if (!chartRef.current) {
+      return;
+    }
+
+    const chart = echarts.init(chartRef.current);
+    chartInstanceRef.current = chart;
+
+    const resizeObserver = new ResizeObserver(() => {
+      chart.resize();
+    });
+
+    resizeObserver.observe(chartRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+      chart.dispose();
+      chartInstanceRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const chart = chartInstanceRef.current;
+
+    if (!chart) {
+      return;
+    }
+
+    const safeData =
+      data.length > 0
+        ? data
+        : [
+            {
+              name: "-",
+              readQps: 0,
+              writeQps: 0,
+              readRows: 0,
+              writeRows: 0,
+            },
+          ];
+
+    chart.setOption(
+      {
+        color: ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6"],
+        tooltip: {
+          trigger: "axis",
+          backgroundColor: "rgba(255,255,255,0.96)",
+          borderColor: "#e2e8f0",
+          borderWidth: 1,
+          padding: [10, 12],
+          textStyle: {
+            color: "#334155",
+            fontSize: 12,
+          },
+          axisPointer: {
+            type: "line",
+            lineStyle: {
+              color: "#94a3b8",
+              width: 1,
+              type: "dashed",
+            },
+          },
+          formatter: (params: any) => {
+            const list = Array.isArray(params) ? params : [params];
+            const title = list[0]?.axisValue || "";
+
+            const rows = list
+              .map((item: any) => {
+                const isQps = String(item.seriesName).includes("QPS");
+                const unit = isQps ? "行/秒" : "行";
+                const value = isQps
+                  ? formatDecimal(item.value)
+                  : formatNumber(item.value);
+
+                return `
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:6px;">
+                    <span>${item.marker}${item.seriesName}</span>
+                    <span style="font-weight:600;color:#0f172a;">${value} ${unit}</span>
+                  </div>
+                `;
+              })
+              .join("");
+
+            return `
+              <div>
+                <div style="font-weight:600;color:#0f172a;margin-bottom:4px;">${title}</div>
+                ${rows}
+              </div>
+            `;
+          },
+        },
+        legend: {
+          top: 2,
+          right: 8,
+          itemWidth: 10,
+          itemHeight: 6,
+          icon: "roundRect",
+          textStyle: {
+            color: "#64748b",
+            fontSize: 12,
+          },
+        },
+        grid: {
+          top: 48,
+          left: 46,
+          right: 54,
+          bottom: 32,
+        },
+        xAxis: {
+          type: "category",
+          boundaryGap: false,
+          data: safeData.map((item) => item.name),
+          axisLine: {
+            lineStyle: {
+              color: "#e2e8f0",
+            },
+          },
+          axisTick: {
+            show: false,
+          },
+          axisLabel: {
+            color: "#94a3b8",
+            fontSize: 11,
+          },
+        },
+        yAxis: [
+          {
+            type: "value",
+            name: "QPS",
+            min: 0,
+            nameTextStyle: {
+              color: "#94a3b8",
+              fontSize: 11,
+            },
+            axisLabel: {
+              color: "#94a3b8",
+              formatter: (value: number) => formatCompactNumber(value),
+            },
+            splitLine: {
+              lineStyle: {
+                color: "#f1f5f9",
+              },
+            },
+          },
+          {
+            type: "value",
+            name: "行数",
+            min: 0,
+            nameTextStyle: {
+              color: "#94a3b8",
+              fontSize: 11,
+            },
+            axisLabel: {
+              color: "#94a3b8",
+              formatter: (value: number) => formatCompactNumber(value),
+            },
+            splitLine: {
+              show: false,
+            },
+          },
+        ],
+        series: [
+          {
+            name: "读取 QPS",
+            type: "line",
+            yAxisIndex: 0,
+            smooth: true,
+            showSymbol: false,
+            lineStyle: {
+              width: 2,
+            },
+            areaStyle: {
+              opacity: 0.08,
+            },
+            emphasis: {
+              focus: "series",
+            },
+            data: safeData.map((item) => item.readQps),
+          },
+          {
+            name: "写入 QPS",
+            type: "line",
+            yAxisIndex: 0,
+            smooth: true,
+            showSymbol: false,
+            lineStyle: {
+              width: 2,
+            },
+            areaStyle: {
+              opacity: 0.08,
+            },
+            emphasis: {
+              focus: "series",
+            },
+            data: safeData.map((item) => item.writeQps),
+          },
+          {
+            name: "读取行数",
+            type: "line",
+            yAxisIndex: 1,
+            smooth: true,
+            showSymbol: false,
+            lineStyle: {
+              width: 2,
+            },
+            areaStyle: {
+              opacity: 0.06,
+            },
+            emphasis: {
+              focus: "series",
+            },
+            data: safeData.map((item) => item.readRows),
+          },
+          {
+            name: "写入行数",
+            type: "line",
+            yAxisIndex: 1,
+            smooth: true,
+            showSymbol: false,
+            lineStyle: {
+              width: 2,
+            },
+            areaStyle: {
+              opacity: 0.06,
+            },
+            emphasis: {
+              focus: "series",
+            },
+            data: safeData.map((item) => item.writeRows),
+          },
+        ],
+      },
+      true
+    );
+  }, [data]);
+
+  return (
+    <div className="rounded-2xl  border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]">
+      <div ref={chartRef} className="h-[300px] w-full" />
+    </div>
+  );
 };
 
 const MetricsTab: React.FC<MetricsTabProps> = ({ instanceItem }) => {
@@ -271,10 +449,14 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ instanceItem }) => {
       try {
         // const res = await batchJobInstanceApi.tableMetrics(instanceId);
         // const list = getResponseData(res);
-
+        //
         // if (!cancelled) {
         //   setTableMetrics(list);
         // }
+
+        if (!cancelled) {
+          setTableMetrics([]);
+        }
       } catch (error) {
         if (!cancelled) {
           setTableMetrics([]);
@@ -302,6 +484,11 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ instanceItem }) => {
       writeRowsTrend: buildTrend(writeRows, 4),
     }),
     [readQps, writeQps, readRows, writeRows]
+  );
+
+  const flowMetricPoints = useMemo(
+    () => buildFlowMetricPoints(instanceItem, metrics),
+    [instanceItem, metrics]
   );
 
   const tableColumns = useMemo(
@@ -390,7 +577,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ instanceItem }) => {
         ),
       },
       {
-        title: "读取QPS",
+        title: "读取 QPS",
         dataIndex: "readQps",
         key: "readQps",
         width: 100,
@@ -400,7 +587,7 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ instanceItem }) => {
         ),
       },
       {
-        title: "写入QPS",
+        title: "写入 QPS",
         dataIndex: "writeQps",
         key: "writeQps",
         width: 100,
@@ -427,73 +614,20 @@ const MetricsTab: React.FC<MetricsTabProps> = ({ instanceItem }) => {
     <Card
       size="small"
       className="mt-2 !rounded-2xl !border-slate-200 !shadow-[0_1px_3px_rgba(15,23,42,0.04)]"
-      bodyStyle={{ padding: 16,marginBottom: 116 }}
+      bodyStyle={{ padding: 16, marginBottom: 116 }}
     >
-      <div className="space-y-6" >
+      <div className="space-y-6">
         <section>
           <SectionHeader
             icon={<Gauge size={16} strokeWidth={1.9} />}
-            title={t("pages.job.detail.metrics.throughput", "吞吐速率")}
+            title={t("pages.job.detail.metrics.flowTrend", "同步流量趋势")}
             description={t(
-              "pages.job.detail.metrics.throughputDesc",
-              "当前实例的读取与写入处理速度"
+              "pages.job.detail.metrics.flowTrendDesc",
+              "查看当前实例读取、写入速率与累计同步数据量变化"
             )}
           />
 
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-            <MetricCard
-              title={t("pages.job.detail.metrics.readQps", "读取 QPS")}
-              value={readQps}
-              unit={t("pages.job.detail.metrics.unit.rowsPerSecond", "行/秒")}
-              hint={t("pages.job.detail.metrics.recentTrend", "最近趋势")}
-              icon={<ArrowDownToLine size={17} strokeWidth={1.9} />}
-              accentClassName="border-blue-100 bg-blue-50 text-blue-600"
-              trendData={metrics.readQpsTrend}
-            />
-
-            <MetricCard
-              title={t("pages.job.detail.metrics.writeQps", "写入 QPS")}
-              value={writeQps}
-              unit={t("pages.job.detail.metrics.unit.rowsPerSecond", "行/秒")}
-              hint={t("pages.job.detail.metrics.recentTrend", "最近趋势")}
-              icon={<ArrowUpFromLine size={17} strokeWidth={1.9} />}
-              accentClassName="border-emerald-100 bg-emerald-50 text-emerald-600"
-              trendData={metrics.writeQpsTrend}
-            />
-          </div>
-        </section>
-
-        <section>
-          <SectionHeader
-            icon={<Database size={16} strokeWidth={1.9} />}
-            title={t("pages.job.detail.metrics.totalVolume", "同步总量")}
-            description={t(
-              "pages.job.detail.metrics.totalVolumeDesc",
-              "当前运行实例累计处理的数据量"
-            )}
-          />
-
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-            <MetricCard
-              title={t("pages.job.detail.metrics.readRows", "读取行数")}
-              value={readRows}
-              unit={t("pages.job.detail.metrics.unit.records", "行")}
-              hint={t("pages.job.detail.metrics.accumulated", "累计")}
-              icon={<ArrowDownToLine size={17} strokeWidth={1.9} />}
-              accentClassName="border-amber-100 bg-amber-50 text-amber-600"
-              trendData={metrics.readRowsTrend}
-            />
-
-            <MetricCard
-              title={t("pages.job.detail.metrics.writeRows", "写入行数")}
-              value={writeRows}
-              unit={t("pages.job.detail.metrics.unit.records", "行")}
-              hint={t("pages.job.detail.metrics.accumulated", "累计")}
-              icon={<ArrowUpFromLine size={17} strokeWidth={1.9} />}
-              accentClassName="border-violet-100 bg-violet-50 text-violet-600"
-              trendData={metrics.writeRowsTrend}
-            />
-          </div>
+          <MetricsFlowChart data={flowMetricPoints} />
         </section>
 
         <section>

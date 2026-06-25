@@ -2,6 +2,7 @@ package org.apache.seatunnel.plugin.datasource.oracle.param;
 
 import com.google.auto.service.AutoService;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.seatunnel.plugin.datasource.api.analysis.JobDefinitionAnalyzer;
 import org.apache.seatunnel.plugin.datasource.api.hocon.DataSourceHoconBuilder;
 import org.apache.seatunnel.plugin.datasource.api.hocon.DataSourceHoconBuilderFactory;
 import org.apache.seatunnel.plugin.datasource.api.jdbc.*;
@@ -50,6 +51,11 @@ public class OracleDataSourceProcessor extends AbstractDataSourceProcessor {
     @Override
     public DataSourceProcessor create() {
         return new OracleDataSourceProcessor();
+    }
+
+    @Override
+    public JobDefinitionAnalyzer getJobDefinitionAnalyzer() {
+        return null;
     }
 
 }

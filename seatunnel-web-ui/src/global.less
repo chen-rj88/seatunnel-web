@@ -615,16 +615,38 @@ ol {
   font-weight: 500;
 }
 
-.ant-tooltip-inner {
-  background: white !important;
-}
-
-.ant-tooltip .ant-tooltip-arrow:before {
-  background: white !important;
-}
+/* =========================
+   Antd Tooltip Modern Style
+   ========================= */
 
 .ant-tooltip .ant-tooltip-inner {
-  color: rgba(0, 0, 0, 0.8) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  color: rgba(15, 23, 42, 0.85) !important;
+
+  font-size: 12px;
+  line-height: 18px;
+
+  padding: 8px 12px;
+  border-radius: 12px;
+
+  max-width: 280px;
+
+  border: 1px solid rgba(226, 232, 240, 0.7);
+
+  backdrop-filter: blur(10px);
+
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+}
+
+/* arrow */
+.ant-tooltip .ant-tooltip-arrow::before {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(226, 232, 240, 0.7);
+}
+
+/* optional: smoother animation feel */
+.ant-tooltip {
+  --antd-arrow-background-color: transparent;
 }
 
 .ant-pro-global-header-header-actions-avatar>div {

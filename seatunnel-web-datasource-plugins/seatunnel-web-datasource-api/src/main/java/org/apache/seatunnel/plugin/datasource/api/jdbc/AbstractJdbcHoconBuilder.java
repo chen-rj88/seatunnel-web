@@ -17,8 +17,13 @@ public abstract class AbstractJdbcHoconBuilder {
 
     protected void putConnCommon(Config conn, Map<String, Object> map) {
         map.put(URL, JdbcConfigReaders.getStringRequired(conn, URL));
-        map.put(USER, JdbcConfigReaders.getStringRequired(conn, USER));
-        map.put(DRIVER, JdbcConfigReaders.getString(conn, DRIVER, defaultDriver()));
+        map.put(USERNAME, JdbcConfigReaders.getStringRequired(conn, USER));
+
+        String driver = JdbcConfigReaders.getString(conn, DRIVER, "");
+        if (StringUtils.isBlank(driver)) {
+            driver = defaultDriver();
+        }
+        map.put(DRIVER, driver);
 
         String password = JdbcConfigReaders.getString(conn, PASSWORD, "");
         if (StringUtils.isNotBlank(password)) {

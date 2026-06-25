@@ -11,13 +11,11 @@ import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 
-@SpringBootApplication(scanBasePackages = {"org.apache.seatunnel.web.*"})
+@SpringBootApplication(scanBasePackages = {"org.apache.seatunnel.*"})
 @EnableConfigurationProperties
 @EnableScheduling
 @EnableAsync(proxyTargetClass = true)
 public class SeaTunnelWebApplication {
-
-    private static final Logger logger = LoggerFactory.getLogger(SeaTunnelWebApplication.class);
 
     public static void main(String[] args) {
         try {

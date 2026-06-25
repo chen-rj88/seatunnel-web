@@ -1,6 +1,6 @@
 package org.apache.seatunnel.web.engine.client.rest;
 
-import org.apache.seatunnel.web.engine.client.exceptions.SeatunnelClientException;
+import org.apache.seatunnel.web.engine.client.exceptions.SeaTunnelClientException;
 import org.apache.seatunnel.web.engine.client.modal.SeaTunnelClientAuth;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.*;
@@ -38,7 +38,7 @@ public class SeaTunnelRestClient {
         String baseApiUrl = seatunnelClientResolver.resolveBaseApiUrl(clientId);
 
         if (baseApiUrl == null || baseApiUrl.trim().isEmpty()) {
-            throw new SeatunnelClientException(
+            throw new SeaTunnelClientException(
                     "SeaTunnel client baseUrl is empty",
                     -1,
                     "",
@@ -165,7 +165,7 @@ public class SeaTunnelRestClient {
     private RuntimeException wrap(Exception e, String hint) {
         if (e instanceof HttpStatusCodeException) {
             HttpStatusCodeException he = (HttpStatusCodeException) e;
-            return new SeatunnelClientException(
+            return new SeaTunnelClientException(
                     hint,
                     he.getRawStatusCode(),
                     safe(he.getResponseBodyAsString()),
@@ -173,7 +173,7 @@ public class SeaTunnelRestClient {
             );
         }
 
-        return new SeatunnelClientException(
+        return new SeaTunnelClientException(
                 hint,
                 -1,
                 "",
@@ -408,6 +408,15 @@ public class SeaTunnelRestClient {
     }
 
     public Map submitJobUpload(Long clientId, byte[] fileBytes, String filename) {
+        return submitJobUpload(clientId, fileBytes, filename, null, null, null);
+    }
+
+    public Map submitJobUpload(Long clientId,
+                               byte[] fileBytes,
+                               String filename,
+                               String jobId,
+                               String jobName,
+                               Boolean isStartWithSavePoint) {
         try {
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
 
@@ -425,8 +434,13 @@ public class SeaTunnelRestClient {
                     multipartHeaders(clientId)
             );
 
+            UriComponentsBuilder builder =
+                    UriComponentsBuilder.fromHttpUrl(url(clientId, "/submit-job/upload"));
+
+            appendSubmitJobParams(builder, jobId, jobName, isStartWithSavePoint);
+
             ResponseEntity<Map> response = restTemplate.exchange(
-                    url(clientId, "/submit-job/upload"),
+                    builder.build(true).toUriString(),
                     HttpMethod.POST,
                     request,
                     Map.class

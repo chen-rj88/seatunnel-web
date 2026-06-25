@@ -8,12 +8,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.web.api.service.StreamingJobDefinitionService;
 import org.apache.seatunnel.web.api.service.StreamingJobInstanceService;
 import org.apache.seatunnel.web.api.service.StreamingJobMetricsService;
+import org.apache.seatunnel.web.api.service.cdc.CdcServerIdAllocationService;
 import org.apache.seatunnel.web.common.enums.ReleaseState;
+import org.apache.seatunnel.web.common.modal.JobDefinitionAnalysisResult;
 import org.apache.seatunnel.web.common.utils.JSONUtils;
 import org.apache.seatunnel.web.core.exceptions.ServiceException;
 import org.apache.seatunnel.web.core.job.assembler.StreamingJobDefinitionAssembler;
 import org.apache.seatunnel.web.core.job.handler.JobDefinitionModeHandler;
-import org.apache.seatunnel.web.core.job.model.JobDefinitionAnalysisResult;
 import org.apache.seatunnel.web.core.job.registry.JobDefinitionModeHandlerRegistry;
 import org.apache.seatunnel.web.dao.entity.StreamingJobDefinitionContentEntity;
 import org.apache.seatunnel.web.dao.entity.StreamingJobDefinitionEntity;
@@ -58,6 +59,9 @@ public class StreamingJobDefinitionServiceImpl extends BaseServiceImpl implement
     private StreamingJobDefinitionQueryService definitionQueryService;
 
     @Resource
+    private CdcServerIdAllocationService cdcServerIdAllocationService;
+
+    @Resource
     private StreamingJobInstanceService streamingJobInstanceService;
 
     @Resource
@@ -87,6 +91,8 @@ public class StreamingJobDefinitionServiceImpl extends BaseServiceImpl implement
             SaveContext context = prepareSaveContext(command);
 
             StreamingJobDefinitionEntity entity = saveDefinition(command, context);
+            cdcServerIdAllocationService.prepare(command, entity.getId());
+            context.setDefinitionContent(context.getHandler().serializeDefinition(command));
             saveDefinitionContent(command, context, entity);
 
             return entity.getId();
@@ -94,7 +100,7 @@ public class StreamingJobDefinitionServiceImpl extends BaseServiceImpl implement
             throw e;
         } catch (Exception e) {
             log.error("Save or update streaming job definition failed, command={}", command, e);
-            throw new ServiceException(Status.SAVE_OR_UPDATE_BATCH_JOB_DEFINITION_ERROR);
+            throw new ServiceException(e.getMessage());
         }
     }
 
@@ -133,7 +139,7 @@ public class StreamingJobDefinitionServiceImpl extends BaseServiceImpl implement
             throw e;
         } catch (Exception e) {
             log.error("Build streaming hocon config failed, command={}", command, e);
-            throw new ServiceException(Status.BUILD_BATCH_JOB_HOCON_CONFIG_ERROR);
+            throw new ServiceException(e.getMessage());
         }
     }
 
@@ -207,6 +213,7 @@ public class StreamingJobDefinitionServiceImpl extends BaseServiceImpl implement
         validateDelete(definition.getId());
 
         try {
+            cdcServerIdAllocationService.release(jobDefinitionId);
             streamingJobInstanceService.removeAllByDefinitionId(jobDefinitionId);
             streamingJobDefinitionContentDao.deleteByJobDefinitionId(jobDefinitionId);
 

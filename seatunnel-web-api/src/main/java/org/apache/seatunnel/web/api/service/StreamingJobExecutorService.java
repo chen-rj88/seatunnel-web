@@ -17,10 +17,27 @@ public interface StreamingJobExecutorService {
     Long jobExecute(Long jobDefineId, RunMode runMode);
 
     /**
-     * Pause a running streaming job instance.
+     * Pause a running streaming job instance without savepoint.
      *
      * @param jobInstanceId job instance id
      * @return job instance id
      */
     Long jobPause(Long jobInstanceId);
+
+    /**
+     * Stop a running streaming job instance with savepoint.
+     *
+     * @param jobInstanceId job instance id
+     * @return job instance id
+     */
+    Long jobStopWithSavepoint(Long jobInstanceId);
+
+    /**
+     * Resume a streaming job from a previous savepoint.
+     *
+     * @param sourceJobInstanceId source job instance id which was stopped with savepoint
+     * @param runMode run mode
+     * @return new job instance id
+     */
+    Long jobResumeFromSavepoint(Long sourceJobInstanceId, RunMode runMode);
 }

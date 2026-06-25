@@ -50,4 +50,49 @@ public class StreamingJobExecutorController {
         Long id = streamingJobExecutorService.jobPause(jobInstanceId);
         return Result.buildSuc(id);
     }
+
+    /**
+     * Stop a running streaming job with savepoint.
+     *
+     * <p>
+     * This API is mainly used by CDC jobs. The engine will stop the job after saving
+     * the current state. The saved state can be used by resume-from-savepoint.
+     * </p>
+     */
+    @PostMapping("/stop-with-savepoint")
+    @Operation(
+            summary = "stopStreamingJobWithSavepoint",
+            description = "Stop streaming job with Zeta savepoint by instance id"
+    )
+    @Parameters({
+            @Parameter(name = "jobInstanceId", description = "STREAMING_JOB_INSTANCE_ID", required = true)
+    })
+    @ApiException(JOB_DEFINITION_EXECUTE_ERROR)
+    public Result<Long> stopWithSavepoint(@RequestParam("jobInstanceId") Long jobInstanceId) {
+        Long id = streamingJobExecutorService.jobStopWithSavepoint(jobInstanceId);
+        return Result.buildSuc(id);
+    }
+
+    /**
+     * Resume a streaming job from a previous savepoint.
+     *
+     * <p>
+     * sourceJobInstanceId is the stopped instance id which was stopped by
+     * stop-with-savepoint.
+     * </p>
+     */
+    @PostMapping("/resume-from-savepoint")
+    @Operation(
+            summary = "resumeStreamingJobFromSavepoint",
+            description = "Resume streaming job from previous Zeta savepoint"
+    )
+    @Parameters({
+            @Parameter(name = "sourceJobInstanceId", description = "SOURCE_STREAMING_JOB_INSTANCE_ID", required = true)
+    })
+    @ApiException(JOB_DEFINITION_EXECUTE_ERROR)
+    public Result<Long> resumeFromSavepoint(@RequestParam("sourceJobInstanceId") Long sourceJobInstanceId) {
+        Long newJobInstanceId =
+                streamingJobExecutorService.jobResumeFromSavepoint(sourceJobInstanceId, RunMode.MANUAL);
+        return Result.buildSuc(newJobInstanceId);
+    }
 }

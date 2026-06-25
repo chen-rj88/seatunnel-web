@@ -1,6 +1,12 @@
 import { Divider, message, Modal } from "antd";
 import moment from "moment";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { history } from "umi";
 
 import {
@@ -10,9 +16,10 @@ import {
 import BottomActionBar from "./components/BottomActionBar";
 import RealtimeHeader from "./components/RealtimeHeader";
 import RealtimeTaskTable from "./components/RealtimeTaskTable";
+import RealtimeTaskViewModal from "./components/RealtimeTaskViewModal";
 import SearchToolbar from "./components/SearchToolbar";
 import StreamingHelperSection from "./components/StreamingHelperSection";
-import RealtimeTaskViewModal from "./components/RealtimeTaskViewModal";
+import TaskViewModal from "./components/TaskViewModal";
 
 const REALTIME_DETAIL_CACHE_PREFIX = "stream-link-up-detail";
 
@@ -40,6 +47,9 @@ interface StreamingJobDefinitionVO {
   sinkDatasourceId?: string | number;
   createTime?: string;
   updateTime?: string;
+  savepointPath?: string;
+  checkpointPath?: string;
+  lastErrorMessage?: string;
   checkpointConfig?: string;
 }
 
@@ -167,7 +177,7 @@ const RealtimeSyncPage: React.FC = () => {
   });
 
   const ref = useRef(null);
-
+  const refDetail = useRef(null);
   const [searchValues, setSearchValues] = useState<SearchValues>(() =>
     parseSearchParamsFromUrl()
   );
@@ -258,7 +268,6 @@ const RealtimeSyncPage: React.FC = () => {
       const res = await seatunnelStremJobDefinitionApi.page(queryParams);
 
       if (res?.code !== undefined && res.code !== 0) {
-
         setDataSource([]);
         setPagination((prev) => ({
           ...prev,
@@ -275,7 +284,6 @@ const RealtimeSyncPage: React.FC = () => {
         total: nextTotal || 0,
       }));
     } catch (error) {
-
       setDataSource([]);
       setPagination((prev) => ({
         ...prev,
@@ -378,6 +386,11 @@ const RealtimeSyncPage: React.FC = () => {
     ref.current?.onOpen(true, record, () => {});
   };
 
+  const handleDetail = (record: StreamingJobDefinitionVO) => {
+    console.log("123");
+    refDetail.current?.onOpen(true, record, () => {});
+  };
+
   const handleEdit = async (item: StreamingJobDefinitionVO) => {
     if (!item?.id) {
       message.warning("任务ID不能为空");
@@ -404,11 +417,7 @@ const RealtimeSyncPage: React.FC = () => {
         history.push(`/sync/stream-link-up/${id}/config/script?scene=edit`);
         return;
       }
-
-      
-    } catch (error) {
-      
-    }
+    } catch (error) {}
   };
 
   const handleRun = async (record: StreamingJobDefinitionVO) => {
@@ -618,65 +627,178 @@ const RealtimeSyncPage: React.FC = () => {
     }
   };
 
+  const handleStopWithSavepoint = async (record: StreamingJobDefinitionVO) => {
+    if (!record?.instanceId) {
+      message.warning("当前任务没有运行实例");
+      return;
+    }
+
+    Modal.confirm({
+      title: "停止并保存检查点？",
+      centered: true,
+      content: (
+        <div className="leading-6">
+          该操作会先保存当前实时任务状态，然后停止运行实例。
+          <br />
+          后续可以基于该检查点继续恢复运行。
+        </div>
+      ),
+      okText: "确认保存并停止",
+      cancelText: "取消",
+      okButtonProps: {
+        danger: true,
+        size: "small",
+      },
+      cancelButtonProps: {
+        size: "small",
+      },
+      async onOk() {
+        try {
+          const res = await seatunnelStreamingJobExecuteApi.stopWithSavepoint(
+            record.instanceId
+          );
+
+          if (res?.code !== 0) {
+            message.error(res?.message || res?.msg || "停止并保存检查点失败");
+            return;
+          }
+
+          message.success("已停止任务，并保存检查点");
+          loadData();
+        } catch (error) {
+          message.error("停止并保存检查点失败");
+        }
+      },
+    });
+  };
+
+  const handleResumeFromSavepoint = async (
+    record: StreamingJobDefinitionVO
+  ) => {
+    if (!record?.instanceId) {
+      message.warning("当前任务没有可恢复的历史实例");
+      return;
+    }
+
+    const isOnline =
+      record.releaseState === "ONLINE" || record.releaseState === 1;
+
+    if (!isOnline) {
+      message.warning("请先上线任务，再从检查点恢复");
+      return;
+    }
+
+    if (record.lastJobStatus === "RUNNING") {
+      message.warning("任务正在运行中，不能重复恢复");
+      return;
+    }
+
+    if (!record.savepointPath) {
+      message.warning("当前任务没有可恢复的检查点，请先使用“停止并保存检查点”");
+      return;
+    }
+
+    Modal.confirm({
+      title: "从检查点恢复实时任务？",
+      centered: true,
+      content: (
+        <div className="leading-6">
+          系统会基于最近一次保存的检查点创建新的运行实例。
+          <br />
+          适用于 MySQL CDC、实时同步等需要断点续跑的任务。
+        </div>
+      ),
+      okText: "确认恢复",
+      cancelText: "取消",
+      okButtonProps: {
+        size: "small",
+      },
+      cancelButtonProps: {
+        size: "small",
+      },
+      async onOk() {
+        try {
+          const res = await seatunnelStreamingJobExecuteApi.resumeFromSavepoint(
+            record.instanceId
+          );
+
+          if (res?.code !== 0) {
+            message.error(res?.message || res?.msg || "从检查点恢复失败");
+            return;
+          }
+
+          message.success("已从检查点恢复实时任务");
+          loadData();
+        } catch (error) {
+          message.error("从检查点恢复失败");
+        }
+      },
+    });
+  };
+
   return (
     <>
-    <div className="min-h-screen px-6 pb-24 pt-7 text-slate-950">
-      <RealtimeHeader
-        sourceType={sourceType}
-        sinkType={sinkType}
-        onSourceChange={setSourceType}
-        onSinkChange={setSinkType}
-        onCreate={handleCreate}
-        creating={creating}
-      />
-
-      <div className="mb-5 overflow-hidden">
-        <SearchToolbar
-          initialValues={searchValues}
-          onSearch={handleSearch}
-          onReset={handleReset}
+      <div className="min-h-screen px-6 pb-24 pt-7 text-slate-950">
+        <RealtimeHeader
+          sourceType={sourceType}
+          sinkType={sinkType}
+          onSourceChange={setSourceType}
+          onSinkChange={setSinkType}
+          onCreate={handleCreate}
+          creating={creating}
         />
 
-        <Divider style={{ padding: 0, margin: "16px 0" }} />
+        <div className="mb-5 overflow-hidden">
+          <SearchToolbar
+            initialValues={searchValues}
+            onSearch={handleSearch}
+            onReset={handleReset}
+          />
 
-        <RealtimeTaskTable
-          loading={loading}
-          dataSource={dataSource}
-          selectedRowKeys={selectedRowKeys}
-          onSelectedRowKeysChange={setSelectedRowKeys}
-          pagination={false}
-          onView={handleView}
-          onEdit={handleEdit}
-          onRun={handleRun}
-          onStop={handleStop}
-          onOnline={handleOnline}
-          onOffline={handleOffline}
-          onDelete={handleDelete}
-          onLog={handleLog}
-          onCheckpoint={handleCheckpoint}
+          <Divider style={{ padding: 0, margin: "16px 0" }} />
+
+          <RealtimeTaskTable
+            loading={loading}
+            dataSource={dataSource}
+            selectedRowKeys={selectedRowKeys}
+            onSelectedRowKeysChange={setSelectedRowKeys}
+            pagination={false}
+            onView={handleView}
+            onDetail={handleDetail}
+            onEdit={handleEdit}
+            onRun={handleRun}
+            onStopWithSavepoint={handleStopWithSavepoint}
+            onResumeFromSavepoint={handleResumeFromSavepoint}
+            onStop={handleStop}
+            onOnline={handleOnline}
+            onOffline={handleOffline}
+            onDelete={handleDelete}
+            onLog={handleLog}
+            onCheckpoint={handleCheckpoint}
+          />
+        </div>
+
+        {dataSource.length <= 1 ? (
+          <>
+            <Divider style={{ padding: 0, margin: "12px 0" }} />
+            <StreamingHelperSection />
+          </>
+        ) : null}
+
+        <BottomActionBar
+          total={pagination.total}
+          selectedCount={selectedRowKeys.length}
+          disabled={!hasSelected}
+          onStart={handleBatchStart}
+          onStop={handleBatchStop}
+          current={pagination.current}
+          pageSize={pagination.pageSize}
+          onPageChange={handlePaginationChange}
         />
       </div>
-
-      {!loading && dataSource.length <= 1 ? (
-        <>
-          <Divider style={{ padding: 0, margin: "12px 0" }} />
-          <StreamingHelperSection />
-        </>
-      ) : null}
-
-      <BottomActionBar
-        total={pagination.total}
-        selectedCount={selectedRowKeys.length}
-        disabled={!hasSelected}
-        onStart={handleBatchStart}
-        onStop={handleBatchStop}
-        current={pagination.current}
-        pageSize={pagination.pageSize}
-        onPageChange={handlePaginationChange}
-      />
-    </div>
-    <RealtimeTaskViewModal ref={ref}/></>
-    
+      <RealtimeTaskViewModal ref={ref} />
+      <TaskViewModal ref={refDetail} />
+    </>
   );
 };
 

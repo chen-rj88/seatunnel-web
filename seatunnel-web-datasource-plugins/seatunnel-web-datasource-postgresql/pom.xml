@@ -19,6 +19,13 @@
             <artifactId>seatunnel-web-datasource-api</artifactId>
             <version>${project.version}</version>
         </dependency>
+
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.5.1</version>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
 

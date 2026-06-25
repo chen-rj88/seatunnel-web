@@ -95,4 +95,27 @@ public abstract class AbstractJdbcBatchBuilder extends AbstractJdbcHoconBuilder
 
         return ConfigFactory.parseMap(map);
     }
+
+    @Override
+    public String sourceTemplate() {
+        return ""
+                + "  Jdbc {\n"
+                + "    datasourceId = @\n"
+                + "    database = \"demo\"\n"
+                + "    table_path = \"user\"\n"
+                + "  }\n";
+    }
+
+    @Override
+    public String sinkTemplate() {
+        return ""
+                + "  Jdbc {\n"
+                + "    datasourceId = @\n"
+                + "    table = \"demo.user_sink\"\n"
+                + "    generate_sink_sql = true\n"
+                + "    schema_save_mode = \"CREATE_SCHEMA_WHEN_NOT_EXIST\"\n"
+                + "    data_save_mode = \"APPEND_DATA\"\n"
+                + "    batch_size = 1000\n"
+                + "  }\n";
+    }
 }

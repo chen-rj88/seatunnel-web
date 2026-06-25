@@ -1,67 +1,209 @@
 package org.apache.seatunnel.web.core.job.handler.multi;
 
-import org.apache.seatunnel.web.common.utils.JSONUtils;
-import org.apache.seatunnel.web.core.job.model.JobDefinitionAnalysisResult;
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisContext;
+import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisRole;
+import org.apache.seatunnel.plugin.datasource.api.analysis.JobDefinitionAnalyzer;
+import org.apache.seatunnel.plugin.datasource.api.jdbc.DataSourceProcessor;
+import org.apache.seatunnel.plugin.datasource.api.utils.DataSourceUtils;
+import org.apache.seatunnel.web.common.enums.JobDefinitionMode;
+import org.apache.seatunnel.web.common.modal.JobDefinitionAnalysisResult;
 import org.apache.seatunnel.web.spi.bean.dto.config.GuideMultiJobContent;
+import org.apache.seatunnel.web.spi.enums.DbType;
 import org.springframework.stereotype.Component;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 public class GuideMultiJobAnalyzer {
 
-    private final GuideMultiTableMatchResolver tableMatchResolver;
-
-    public GuideMultiJobAnalyzer(GuideMultiTableMatchResolver tableMatchResolver) {
-        this.tableMatchResolver = tableMatchResolver;
-    }
-
     public JobDefinitionAnalysisResult analyze(GuideMultiJobContent content) {
-        List<String> sourceTables = tableMatchResolver.resolveSourceTables(content);
-        List<String> sinkTables = tableMatchResolver.resolveSinkTables(content);
+        JobDefinitionAnalysisResult sourceAnalysis = analyzeSource(content);
+        JobDefinitionAnalysisResult sinkAnalysis = analyzeSink(content);
 
         return JobDefinitionAnalysisResult.builder()
-                .sourceType(resolveSourceType(content))
-                .sinkType(resolveSinkType(content))
-                .sourceDatasourceId(resolveSourceDatasourceId(content))
-                .sinkDatasourceId(resolveSinkDatasourceId(content))
-                .sourceTable(JSONUtils.toJsonString(sourceTables))
-                .sinkTable(JSONUtils.toJsonString(sinkTables))
+                .sourceType(sourceAnalysis.getSourceType())
+                .sinkType(sinkAnalysis.getSinkType())
+                .sourceDatasourceId(sourceAnalysis.getSourceDatasourceId())
+                .sinkDatasourceId(sinkAnalysis.getSinkDatasourceId())
+                .sourceTable(sourceAnalysis.getSourceTable())
+                .sinkTable(sinkAnalysis.getSinkTable())
                 .build();
     }
 
-    private String resolveSourceType(GuideMultiJobContent content) {
-        if (content == null || content.getSource() == null) {
+    private JobDefinitionAnalysisResult analyzeSource(GuideMultiJobContent content) {
+        GuideMultiJobContent.WorkflowSourceConfig source =
+                content == null ? null : content.getSource();
+
+        return analyzeNode(
+                DatasourceAnalysisRole.SOURCE,
+                source == null ? "" : source.getDbType(),
+                resolveSourcePluginName(source),
+                source == null ? null : source.getDatasourceId(),
+                buildSourcePluginConfig(source, content),
+                content
+        );
+    }
+
+    private JobDefinitionAnalysisResult analyzeSink(GuideMultiJobContent content) {
+        GuideMultiJobContent.WorkflowTargetConfig target =
+                content == null ? null : content.getTarget();
+
+        return analyzeNode(
+                DatasourceAnalysisRole.SINK,
+                target == null ? "" : target.getDbType(),
+                resolveTargetPluginName(target),
+                target == null ? null : target.getDatasourceId(),
+                buildTargetPluginConfig(target, content),
+                content
+        );
+    }
+
+    private JobDefinitionAnalysisResult analyzeNode(DatasourceAnalysisRole role,
+                                                    String dbTypeText,
+                                                    String pluginName,
+                                                    String datasourceId,
+                                                    Config pluginConfig,
+                                                    GuideMultiJobContent content) {
+        if (StringUtils.isBlank(dbTypeText)) {
+            return JobDefinitionAnalysisResult.builder().build();
+        }
+
+        DbType dbType;
+        try {
+            dbType = DbType.valueOf(dbTypeText.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return JobDefinitionAnalysisResult.builder().build();
+        }
+
+        DataSourceProcessor processor = DataSourceUtils.getDatasourceProcessor(dbType);
+        if (processor == null || processor.getJobDefinitionAnalyzer() == null) {
+            return JobDefinitionAnalysisResult.builder().build();
+        }
+
+        JobDefinitionAnalyzer analyzer = processor.getJobDefinitionAnalyzer();
+
+        DatasourceAnalysisContext context = DatasourceAnalysisContext.builder()
+                .mode(JobDefinitionMode.GUIDE_MULTI)
+                .role(role)
+                .dbType(dbType)
+                .pluginName(pluginName)
+                .datasourceId(parseLong(datasourceId))
+                .pluginConfig(pluginConfig)
+                .rawContent(content)
+                .build();
+
+        return analyzer.analyze(context);
+    }
+
+    private Config buildSourcePluginConfig(GuideMultiJobContent.WorkflowSourceConfig source,
+                                           GuideMultiJobContent content) {
+        if (source == null) {
+            return ConfigFactory.empty();
+        }
+
+        Map<String, Object> config = new HashMap<>();
+        putIfNotBlank(config, "dbType", source.getDbType());
+        putIfNotBlank(config, "pluginName", source.getPluginName());
+        putIfNotBlank(config, "connectorType", source.getConnectorType());
+        putIfNotBlank(config, "dataSourceId", source.getDatasourceId());
+
+        List<String> tables = resolveTableList(content);
+        if (CollectionUtils.isNotEmpty(tables)) {
+            config.put("table_list", tables);
+        }
+
+        return ConfigFactory.parseMap(config);
+    }
+
+    private Config buildTargetPluginConfig(GuideMultiJobContent.WorkflowTargetConfig target,
+                                           GuideMultiJobContent content) {
+        if (target == null) {
+            return ConfigFactory.empty();
+        }
+
+        Map<String, Object> config = new HashMap<>();
+        putIfNotBlank(config, "dbType", target.getDbType());
+        putIfNotBlank(config, "pluginName", target.getPluginName());
+        putIfNotBlank(config, "connectorType", target.getConnectorType());
+        putIfNotBlank(config, "dataSourceId", target.getDatasourceId());
+
+        /*
+         * 多表 sink 端直接复用 source 端 table_list。
+         */
+        List<String> tables = resolveTableList(content);
+        if (CollectionUtils.isNotEmpty(tables)) {
+            config.put("table_list", tables);
+        }
+
+        return ConfigFactory.parseMap(config);
+    }
+
+    private List<String> resolveTableList(GuideMultiJobContent content) {
+        if (content == null || content.getTableMatch() == null) {
+            return java.util.Collections.emptyList();
+        }
+
+        List<String> tables = content.getTableMatch().getTables();
+        if (CollectionUtils.isEmpty(tables)) {
+            return java.util.Collections.emptyList();
+        }
+
+        return tables;
+    }
+
+    private void putIfNotBlank(Map<String, Object> config, String key, String value) {
+        if (StringUtils.isNotBlank(value)) {
+            config.put(key, value);
+        }
+    }
+
+    private String resolveSourcePluginName(GuideMultiJobContent.WorkflowSourceConfig source) {
+        if (source == null) {
             return "";
         }
-        return content.getSource().getDbType();
+
+        return firstNonBlank(
+                source.getPluginName(),
+                source.getConnectorType()
+        );
     }
 
-    private String resolveSinkType(GuideMultiJobContent content) {
-        if (content == null || content.getTarget() == null) {
+    private String resolveTargetPluginName(GuideMultiJobContent.WorkflowTargetConfig target) {
+        if (target == null) {
             return "";
         }
-        return content.getTarget().getDbType();
+
+        return firstNonBlank(
+                target.getPluginName(),
+                target.getConnectorType()
+        );
     }
 
-    private Long resolveSourceDatasourceId(GuideMultiJobContent content) {
-        if (content == null || content.getSource() == null) {
-            return null;
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return "";
         }
-        return parseLong(content.getSource().getDatasourceId());
-    }
 
-    private Long resolveSinkDatasourceId(GuideMultiJobContent content) {
-        if (content == null || content.getTarget() == null) {
-            return null;
+        for (String value : values) {
+            if (StringUtils.isNotBlank(value)) {
+                return value.trim();
+            }
         }
-        return parseLong(content.getTarget().getDatasourceId());
+
+        return "";
     }
 
     private Long parseLong(String value) {
-        if (value == null || value.trim().isEmpty()) {
+        if (StringUtils.isBlank(value)) {
             return null;
         }
+
         try {
             return Long.parseLong(value.trim());
         } catch (NumberFormatException ignored) {

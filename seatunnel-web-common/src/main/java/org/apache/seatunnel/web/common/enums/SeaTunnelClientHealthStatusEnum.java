@@ -1,8 +1,8 @@
 package org.apache.seatunnel.web.common.enums;
 
 public enum SeaTunnelClientHealthStatusEnum {
-    LIVE(1, "运行中"),
-    DOWN(2, "离线");
+    LIVE(1, "可用"),
+    DEAD(2, "不可用");
 
     private final int code;
     private final String desc;

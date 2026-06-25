@@ -38,6 +38,13 @@ public abstract class AbstractJdbcConnectionProvider<T extends BaseConnectionPar
      */
     protected abstract String defaultDriverClass();
 
+    protected String resolveDriverClass(T t) {
+        if (StringUtils.hasText(t.getDriver())) {
+            return t.getDriver();
+        }
+        return defaultDriverClass();
+    }
+
     protected String defaultBaseUrl() {
         String baseDir = System.getProperty("user.dir") + File.separator + "jdbc-drivers" + File.separator;
 
@@ -99,7 +106,7 @@ public abstract class AbstractJdbcConnectionProvider<T extends BaseConnectionPar
         DataSourceId dsId = new DataSourceId("11");
 
         DriverDescriptor descriptor = new DriverDescriptor(
-                defaultDriverClass(),
+                resolveDriverClass(t),
                 java.util.Arrays.asList(resolveDriverLocation(t).split(",")),
                 resolveDriverLocation(t)
         );

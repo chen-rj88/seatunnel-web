@@ -68,9 +68,6 @@ public class StreamingJobMetricsServiceImpl implements StreamingJobMetricsServic
     /**
      * 任务级趋势历史表 DAO。
      *
-     * 对应：
-     * t_seatunnel_streaming_job_metrics
-     *
      * 这里只保存采样后的历史趋势，不再每次都写。
      */
     @Resource
@@ -79,8 +76,6 @@ public class StreamingJobMetricsServiceImpl implements StreamingJobMetricsServic
     /**
      * 实时任务最新汇总表 DAO。
      *
-     * 对应：
-     * t_seatunnel_streaming_job_metrics_current
      */
     @Resource
     private StreamingJobMetricsCurrentDao streamingJobMetricsCurrentDao;
@@ -88,8 +83,6 @@ public class StreamingJobMetricsServiceImpl implements StreamingJobMetricsServic
     /**
      * 实时任务表级最新明细表 DAO。
      *
-     * 对应：
-     * t_seatunnel_streaming_job_table_metrics_current
      */
     @Resource
     private StreamingJobTableMetricsCurrentDao streamingJobTableMetricsCurrentDao;

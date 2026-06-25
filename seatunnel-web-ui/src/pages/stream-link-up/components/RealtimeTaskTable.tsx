@@ -16,7 +16,7 @@ interface RealtimeTaskTableProps {
   selectedRowKeys: React.Key[];
   onSelectedRowKeysChange: (keys: React.Key[]) => void;
   pagination?: false | TablePaginationConfig;
-
+  onDetail?: (record: StreamingJobDefinitionVO) => void;
   onView?: (record: StreamingJobDefinitionVO) => void;
   onEdit?: (record: StreamingJobDefinitionVO) => void;
   onRun?: (record: StreamingJobDefinitionVO) => Promise<void> | void;
@@ -41,6 +41,7 @@ const RealtimeTaskTable: React.FC<RealtimeTaskTableProps> = ({
   onSelectedRowKeysChange,
   pagination,
   onView,
+  onDetail,
   onEdit,
   onRun,
   onStop,
@@ -100,7 +101,7 @@ const RealtimeTaskTable: React.FC<RealtimeTaskTableProps> = ({
       dataIndex: "metricsTrend",
       width: 360,
       render: (_content: any, record: StreamingJobDefinitionVO) => (
-        <RealtimeMetricsTrend record={record} />
+        <RealtimeMetricsTrend record={record} onView={onView} />
       ),
     },
     {
@@ -126,7 +127,7 @@ const RealtimeTaskTable: React.FC<RealtimeTaskTableProps> = ({
       render: (_, record) => (
         <RealtimeTaskActionColumn
           record={record}
-          onView={onView}
+          onDetail={onDetail}
           onEdit={onEdit}
           onRun={onRun}
           onStop={onStop}

@@ -17,7 +17,10 @@ public class JdbcMultiSinkTargetBuilder implements JdbcSinkTargetBuilder {
         String tablePattern = JdbcConfigReaders.getString(config, TABLE_PATTERN, "");
         String finalTable = StringUtils.isNotBlank(tablePattern)
                 ? tablePattern.trim()
-                : TABLE_NAME_PLACEHOLDER;
+                : JdbcSinkSchemaResolver.defaultMultiTablePattern(config, conn);
+        if (StringUtils.isBlank(tablePattern)) {
+            finalTable = JdbcOracleSchemaResolver.defaultMultiTablePattern(config, conn, finalTable);
+        }
 
         String finalDatabase = resolveFinalDatabase(config, conn);
 

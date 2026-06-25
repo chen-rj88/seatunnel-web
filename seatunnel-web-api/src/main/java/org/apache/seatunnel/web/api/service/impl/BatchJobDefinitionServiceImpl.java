@@ -7,13 +7,14 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.web.api.service.BatchJobDefinitionService;
 import org.apache.seatunnel.web.api.service.BatchJobInstanceService;
 import org.apache.seatunnel.web.api.service.JobScheduleService;
+import org.apache.seatunnel.web.api.service.cdc.CdcServerIdAllocationService;
 import org.apache.seatunnel.web.api.service.application.JobScheduleApplicationService;
 import org.apache.seatunnel.web.common.enums.ReleaseState;
+import org.apache.seatunnel.web.common.modal.JobDefinitionAnalysisResult;
 import org.apache.seatunnel.web.common.utils.JSONUtils;
 import org.apache.seatunnel.web.core.exceptions.ServiceException;
 import org.apache.seatunnel.web.core.job.assembler.BatchJobDefinitionAssembler;
 import org.apache.seatunnel.web.core.job.handler.JobDefinitionModeHandler;
-import org.apache.seatunnel.web.core.job.model.JobDefinitionAnalysisResult;
 import org.apache.seatunnel.web.core.job.registry.JobDefinitionModeHandlerRegistry;
 import org.apache.seatunnel.web.dao.entity.JobDefinitionContentEntity;
 import org.apache.seatunnel.web.dao.entity.JobDefinitionEntity;
@@ -64,6 +65,9 @@ public class BatchJobDefinitionServiceImpl extends BaseServiceImpl implements Ba
     @Resource
     private JobScheduleService jobScheduleService;
 
+    @Resource
+    private CdcServerIdAllocationService cdcServerIdAllocationService;
+
     /**
      * Save or update batch job definition.
      */
@@ -76,8 +80,6 @@ public class BatchJobDefinitionServiceImpl extends BaseServiceImpl implements Ba
 
             JobDefinitionModeHandler handler = getAndValidateHandler(command);
             JobDefinitionAnalysisResult analysis = handler.analyze(command);
-            String definitionContent = handler.serializeDefinition(command);
-
             JobDefinitionEntity existing = command.getId() == null
                     ? null
                     : jobDefinitionDao.queryById(command.getId());
@@ -95,6 +97,9 @@ public class BatchJobDefinitionServiceImpl extends BaseServiceImpl implements Ba
             }
 
             jobDefinitionDao.saveOrUpdate(entity);
+
+            cdcServerIdAllocationService.prepare(command, entity.getId());
+            String definitionContent = handler.serializeDefinition(command);
 
             JobDefinitionContentEntity contentEntity = JobDefinitionContentEntity.builder()
                     .jobDefinitionId(entity.getId())
@@ -204,6 +209,7 @@ public class BatchJobDefinitionServiceImpl extends BaseServiceImpl implements Ba
         validateDelete(definition.getId());
 
         try {
+            cdcServerIdAllocationService.release(jobDefinitionId);
             scheduleApplicationService.removeSchedule(jobDefinitionId);
             jobInstanceService.removeAllByDefinitionId(jobDefinitionId);
             jobDefinitionContentDao.deleteByJobDefinitionId(jobDefinitionId);
@@ -264,14 +270,14 @@ public class BatchJobDefinitionServiceImpl extends BaseServiceImpl implements Ba
 
         ReleaseState currentState = entity.getReleaseState();
 
-        // 状态已经一致时，也顺手同步一下调度状态，避免 Quartz 状态和业务状态不一致
+
         if (releaseState == currentState) {
             syncScheduleState(id, releaseState);
             log.info("Batch job definition release state already synced, id={}, state={}", id, releaseState);
             return true;
         }
 
-        // 下线：先停调度，再更新任务定义状态
+
         if (releaseState.isOffline()) {
             syncScheduleState(id, ReleaseState.OFFLINE);
             updateJobReleaseState(id, ReleaseState.OFFLINE);
@@ -280,7 +286,7 @@ public class BatchJobDefinitionServiceImpl extends BaseServiceImpl implements Ba
             return true;
         }
 
-        // 上线：先更新任务定义状态，再启动调度
+
         if (releaseState.isOnline()) {
             updateJobReleaseState(id, ReleaseState.ONLINE);
             syncScheduleState(id, ReleaseState.ONLINE);

@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("t_seatunnel_time_variable")
+@TableName("t_seatunnel_web_time_variable")
 public class TimeVariable extends BaseEntity{
 
     @TableId(type = IdType.ASSIGN_ID)

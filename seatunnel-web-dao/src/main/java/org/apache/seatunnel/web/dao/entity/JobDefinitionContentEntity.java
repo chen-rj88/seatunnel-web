@@ -13,7 +13,7 @@ import java.util.Date;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("t_seatunnel_job_definition_content")
+@TableName("t_seatunnel_web_job_definition_content")
 public class JobDefinitionContentEntity {
 
     private Long id;

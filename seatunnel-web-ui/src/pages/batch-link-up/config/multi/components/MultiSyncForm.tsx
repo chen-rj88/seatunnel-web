@@ -96,8 +96,8 @@ const MultiSyncForm: React.FC<Props> = ({
             <TextArea
               placeholder={
                 matchMode === "2"
-                  ? "请输入正则表达式，例如：^ods_.*"
-                  : "请输入表名，多个可换行或按规则输入"
+                  ? "请输入正则表达式，例如：ods_.*, ..*"
+                  : "英文逗号隔开的表名"
               }
               rows={4}
               value={tableKeyword}

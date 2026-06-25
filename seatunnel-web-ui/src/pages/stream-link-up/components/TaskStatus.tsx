@@ -428,6 +428,7 @@ const TaskStatus: React.FC<TaskStatusProps> = ({ status, errorMessage }) => {
         setCopied(false);
       }, 1800);
     } catch (err) {
+      console.log(err)
       message.error("复制失败，请手动复制");
     }
   };

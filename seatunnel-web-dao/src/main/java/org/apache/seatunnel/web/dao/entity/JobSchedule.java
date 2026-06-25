@@ -11,7 +11,7 @@ import java.util.Date;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("t_seatunnel_job_schedule")
+@TableName("t_seatunnel_web_job_schedule")
 public class JobSchedule extends BaseEntity {
 
     /**

@@ -102,12 +102,12 @@
         SELECT
         <include refid="BaseSelectColumns"/>
 
-        FROM t_seatunnel_streaming_job_instance i
+        FROM t_seatunnel_web_streaming_job_instance i
 
-        LEFT JOIN t_seatunnel_streaming_job_definition d
+        LEFT JOIN t_seatunnel_web_streaming_job_definition d
         ON i.job_definition_id = d.id
 
-        LEFT JOIN t_seatunnel_streaming_job_metrics_current m
+        LEFT JOIN t_seatunnel_web_streaming_job_metrics_current m
         ON i.id = m.job_instance_id
 
         WHERE i.id = #{id}
@@ -121,12 +121,12 @@
         SELECT
         <include refid="BaseSelectColumns"/>
 
-        FROM t_seatunnel_streaming_job_instance i
+        FROM t_seatunnel_web_streaming_job_instance i
 
-        LEFT JOIN t_seatunnel_streaming_job_definition d
+        LEFT JOIN t_seatunnel_web_streaming_job_definition d
         ON i.job_definition_id = d.id
 
-        LEFT JOIN t_seatunnel_streaming_job_metrics_current m
+        LEFT JOIN t_seatunnel_web_streaming_job_metrics_current m
         ON i.id = m.job_instance_id
 
         <where>

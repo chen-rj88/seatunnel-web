@@ -4,6 +4,7 @@ import com.typesafe.config.Config;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.seatunnel.plugin.datasource.api.jdbc.JdbcConfigReaders;
+import org.apache.seatunnel.plugin.datasource.api.jdbc.TablePath;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -96,6 +97,58 @@ public class JdbcTableNameResolver {
         return buildTablePath(database, schema, table);
     }
 
+    public String resolveDatabase(Config config, Config conn) {
+        String database = firstNonBlank(
+                JdbcConfigReaders.getString(config, DATABASE, ""),
+                JdbcConfigReaders.getString(conn, DATABASE, ""));
+        if (StringUtils.isNotBlank(database)) {
+            return database;
+        }
+
+        if (isPostgreSql(config, conn)) {
+            return extractPostgreSqlDatabaseFromUrl(
+                    firstNonBlank(
+                            JdbcConfigReaders.getString(config, URL, ""),
+                            JdbcConfigReaders.getString(conn, URL, "")));
+        }
+
+        return "";
+    }
+
+    public String resolveSchema(Config config, Config conn) {
+        return firstNonBlank(
+                JdbcConfigReaders.getString(config, SCHEMA, ""),
+                JdbcConfigReaders.getString(config, SCHEMA_NAME, ""),
+                JdbcConfigReaders.getString(conn, SCHEMA, ""),
+                JdbcConfigReaders.getString(conn, SCHEMA_NAME, ""));
+    }
+
+    public String normalizeSourceTablePath(
+            Config config,
+            Config conn,
+            String database,
+            String schema,
+            String table) {
+        if (StringUtils.isBlank(table)) {
+            return "";
+        }
+
+        String trimmed = table.trim();
+        if (isPostgreSql(config, conn)) {
+            return normalizePostgreSqlSourceTablePath(database, schema, trimmed);
+        }
+
+        if (isOracle(config, conn)) {
+            return normalizeOracleSourceTablePath(schema, trimmed);
+        }
+
+        if (isFullTablePath(trimmed)) {
+            return trimmed;
+        }
+
+        return buildTablePath(database, schema, trimmed);
+    }
+
     public String buildTablePath(String database, String schema, String table) {
         if (StringUtils.isBlank(table)) {
             return "";
@@ -116,6 +169,54 @@ public class JdbcTableNameResolver {
         return table.trim();
     }
 
+    private String normalizeOracleSourceTablePath(String schema, String table) {
+        if (StringUtils.isBlank(table)) {
+            return "";
+        }
+
+        String trimmed = table.trim();
+        if (isFullTablePath(trimmed)) {
+            return trimmed;
+        }
+
+        if (StringUtils.isNotBlank(schema)) {
+            return schema.trim() + "." + trimmed;
+        }
+
+        return trimmed;
+    }
+
+    private String normalizePostgreSqlSourceTablePath(String database, String schema, String table) {
+        String[] parts = StringUtils.split(table, '.');
+        if (parts == null || parts.length == 0) {
+            return "";
+        }
+
+        if (parts.length >= 3) {
+            return table;
+        }
+
+        if (parts.length == 2) {
+            if (StringUtils.isBlank(database)) {
+                return table;
+            }
+
+            String firstPart = parts[0].trim();
+            String tableName = parts[1].trim();
+            if (StringUtils.equals(firstPart, database.trim()) && StringUtils.isNotBlank(schema)) {
+                return TablePath.of(database.trim(), schema.trim(), tableName).getFullName();
+            }
+
+            return TablePath.of(database.trim(), firstPart, tableName).getFullName();
+        }
+
+        String finalSchema = StringUtils.isNotBlank(schema) ? schema.trim() : "public";
+        return TablePath.of(
+                normalizeBlank(database),
+                finalSchema,
+                parts[0].trim()).getFullName();
+    }
+
     public boolean isFullTablePath(String table) {
         return StringUtils.isNotBlank(table) && table.contains(".");
     }
@@ -132,6 +233,65 @@ public class JdbcTableNameResolver {
         }
 
         return "";
+    }
+
+    private boolean isPostgreSql(Config config, Config conn) {
+        return containsIgnoreCase(config, PLUGIN_NAME, "postgres")
+                || containsIgnoreCase(conn, PLUGIN_NAME, "postgres")
+                || containsIgnoreCase(config, DB_TYPE, "postgre")
+                || containsIgnoreCase(conn, DB_TYPE, "postgre")
+                || containsIgnoreCase(config, DRIVER, "postgresql")
+                || containsIgnoreCase(conn, DRIVER, "postgresql")
+                || startsWithIgnoreCase(config, URL, "jdbc:postgresql:")
+                || startsWithIgnoreCase(conn, URL, "jdbc:postgresql:");
+    }
+
+    private boolean isOracle(Config config, Config conn) {
+        return containsIgnoreCase(config, PLUGIN_NAME, "oracle")
+                || containsIgnoreCase(conn, PLUGIN_NAME, "oracle")
+                || containsIgnoreCase(config, DB_TYPE, "oracle")
+                || containsIgnoreCase(conn, DB_TYPE, "oracle")
+                || containsIgnoreCase(config, DRIVER, "oracle")
+                || containsIgnoreCase(conn, DRIVER, "oracle")
+                || startsWithIgnoreCase(config, URL, "jdbc:oracle:")
+                || startsWithIgnoreCase(conn, URL, "jdbc:oracle:");
+    }
+
+    private boolean containsIgnoreCase(Config config, String path, String searchText) {
+        return StringUtils.containsIgnoreCase(JdbcConfigReaders.getString(config, path, ""), searchText);
+    }
+
+    private boolean startsWithIgnoreCase(Config config, String path, String prefix) {
+        return StringUtils.startsWithIgnoreCase(JdbcConfigReaders.getString(config, path, ""), prefix);
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (StringUtils.isNotBlank(value)) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
+    private String extractPostgreSqlDatabaseFromUrl(String url) {
+        if (StringUtils.isBlank(url)) {
+            return "";
+        }
+
+        int pathStart = url.indexOf('/', "jdbc:postgresql://".length());
+        if (pathStart < 0 || pathStart + 1 >= url.length()) {
+            return "";
+        }
+
+        int queryStart = url.indexOf('?', pathStart);
+        int end = queryStart >= 0 ? queryStart : url.length();
+        String database = url.substring(pathStart + 1, end);
+        return StringUtils.trimToEmpty(database);
+    }
+
+    private String normalizeBlank(String value) {
+        return StringUtils.isBlank(value) ? null : value.trim();
     }
 
     private List<String> resolveTableNameList(Config config, String path) {

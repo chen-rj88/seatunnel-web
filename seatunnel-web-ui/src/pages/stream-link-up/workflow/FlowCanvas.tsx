@@ -1,20 +1,20 @@
-import { Dropdown } from "antd";
-import { useEffect, useRef } from "react";
+import { Dropdown } from 'antd';
+import { useEffect, useRef } from 'react';
 import ReactFlow, {
   Background,
-  MiniMap,
-  SelectionMode,
   type Edge,
+  MiniMap,
   type Node,
-} from "reactflow";
-import "reactflow/dist/style.css";
+  SelectionMode,
+} from 'reactflow';
+import 'reactflow/dist/style.css';
 
-import { ControlMode } from "./config";
-import CustomEdge from "./edge";
-import useFlowBuilder from "./hooks/useFlowBuilder";
-import useNodePlacement from "./hooks/useNodePlacement";
-import CustomNode from "./nodes";
-import WorkflowPanel from "./panel";
+import { ControlMode } from './config';
+import CustomEdge from './edge';
+import useFlowBuilder from './hooks/useFlowBuilder';
+import useNodePlacement from './hooks/useNodePlacement';
+import CustomNode from './nodes';
+import WorkflowPanel from './panel';
 
 const nodeTypesConfig = {
   custom: CustomNode,
@@ -40,7 +40,7 @@ interface FlowCanvasProps {
 function buildInitialGraph(
   params?: any,
   sourceType?: any,
-  targetType?: any
+  targetType?: any,
 ): {
   nodes: Node[];
   edges: Edge[];
@@ -56,77 +56,79 @@ function buildInitialGraph(
   const sourceId = `source-${timestamp}`;
   const sinkId = `sink-${timestamp}`;
 
-  const sourceDbType = sourceType?.dbType || "MYSQL";
-  const targetDbType = targetType?.dbType || "MYSQL";
+  const sourceDbType = sourceType?.dbType || 'MYSQL';
+  const targetDbType = targetType?.dbType || 'MYSQL';
 
   const sourceTitle =
     sourceType?.dbType ||
     sourceType?.pluginName ||
     sourceType?.connectorType ||
-    "输入端";
+    '输入端';
 
   const sinkTitle =
     targetType?.dbType ||
     targetType?.pluginName ||
     targetType?.connectorType ||
-    "输出端";
+    '输出端';
 
   const nodes: Node[] = [
     {
       id: sourceId,
-      type: "custom",
+      type: 'custom',
       position: { x: 100, y: 180 },
       data: {
-        nodeType: "source",
+        nodeType: 'source',
         title: sourceTitle,
-        description: "读取源端数据",
+        description: '读取源端数据',
         dbType: sourceDbType,
         connectorType: sourceType?.connectorType,
         pluginName: sourceType?.pluginName,
         config: {
-          dataSourceId: params?.sourceDataSourceId || "",
+          dataSourceId: params?.sourceDataSourceId || '',
           dbType: sourceType?.dbType,
           connectorType: sourceType?.connectorType,
           pluginName: sourceType?.pluginName,
           pluginOutput: sourceId,
-          readMode: "table",
+          readMode: 'table',
           table: undefined,
           tableNames: [],
-          startupMode: "initial",
+          startupMode: 'initial',
           startupSpecificOffsetFile: undefined,
           startupSpecificOffsetPos: undefined,
           startupTimestamp: undefined,
-          sql: "",
+          serverIdMode: 'MANUAL',
+          serverId: '',
+          sql: '',
           extraParams: [],
         },
         meta: {
           outputSchema: [],
-          schemaStatus: "idle",
-          schemaError: "",
+          schemaStatus: 'idle',
+          schemaError: '',
         },
       },
     },
     {
       id: sinkId,
-      type: "custom",
+      type: 'custom',
       position: { x: 460, y: 180 },
       data: {
-        nodeType: "sink",
+        nodeType: 'sink',
         title: sinkTitle,
-        description: "写入目标端数据",
+        description: '写入目标端数据',
         dbType: targetDbType,
         connectorType: targetType?.connectorType,
         pluginName: targetType?.pluginName,
         config: {
-          dataSourceId: params?.targetDataSourceId || "",
+          dataSourceId: params?.targetDataSourceId || '',
           autoCreateTable: false,
-          targetMode: "table",
+          targetMode: 'table',
           table: undefined,
-          targetTableName: "",
-          sql: "",
-          writeMode: "append",
-          primaryKey: "",
-          batchSize: "",
+          targetTableName: '',
+          sql: '',
+          writeMode: 'append',
+          primaryKey: '',
+          batchSize: '',
           pluginInput: sinkId,
           extraParams: [],
         },
@@ -139,7 +141,7 @@ function buildInitialGraph(
       id: `${sourceId}-${sinkId}`,
       source: sourceId,
       target: sinkId,
-      type: "custom",
+      type: 'custom',
       data: {},
     },
   ];
@@ -150,7 +152,7 @@ function buildInitialGraph(
 export default function FlowCanvas({
   form,
   params,
-  goBack,
+  goBack: _goBack,
   sourceType,
   targetType,
   onWorkflowChange,
@@ -195,13 +197,13 @@ export default function FlowCanvas({
 
   const onDragOver = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
+    event.dataTransfer.dropEffect = 'move';
   };
 
   const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
 
-    const raw = event.dataTransfer.getData("application/reactflow");
+    const raw = event.dataTransfer.getData('application/reactflow');
     if (!raw) return;
 
     const data = JSON.parse(raw);
@@ -226,9 +228,9 @@ export default function FlowCanvas({
     <div
       className="relative h-full w-full min-w-[960px]"
       style={{
-        height: "100%",
-        width: "100%",
-        cursor: flow.controlMode === ControlMode.Hand ? "grab" : "default",
+        height: '100%',
+        width: '100%',
+        cursor: flow.controlMode === ControlMode.Hand ? 'grab' : 'default',
       }}
       ref={placement.reactFlowWrapper}
       onDragOver={onDragOver}
@@ -276,7 +278,7 @@ export default function FlowCanvas({
           maxZoom: 0.75,
         }}
         className={`reactflow-wrapper ${
-          flow.controlMode === ControlMode.Hand ? "hand-mode" : "pointer-mode"
+          flow.controlMode === ControlMode.Hand ? 'hand-mode' : 'pointer-mode'
         }`}
       >
         <Background gap={[14, 14]} size={2} color="#8585ad26" />
@@ -292,15 +294,15 @@ export default function FlowCanvas({
         overlay={flow.renderContextMenu()}
         open={flow.menuVisible}
         onOpenChange={flow.closeContextMenu}
-        trigger={["contextMenu"]}
+        trigger={['contextMenu']}
       >
         <div
           style={{
-            position: "fixed",
+            position: 'fixed',
             left: flow.menuPosition.x,
             top: flow.menuPosition.y,
-            width: "1px",
-            height: "1px",
+            width: '1px',
+            height: '1px',
           }}
         />
       </Dropdown>

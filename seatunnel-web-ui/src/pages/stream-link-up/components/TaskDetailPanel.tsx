@@ -2,17 +2,13 @@ import { useIntl } from "@umijs/max";
 import { Tabs } from "antd";
 import React, { useEffect, useState } from "react";
 
-
+import BasicInfoSection from "@/pages/batch-link-up/BasicInfoSection";
+import TaskHeader from "@/pages/batch-link-up/TaskHeader";
+import { streamingSeatunnelJobInstanceApi } from "@/pages/batch-link-up/api";
 import HoconTab from "./tabs/HoconTab";
 import LogTab from "./tabs/LogTab";
 import MetricsTab from "./tabs/MetricsTab";
-import ScheduleTab from "./tabs/ScheduleTab";
 import TableTab from "./tabs/TableTab";
-import { seatunnelJobInstanceApi } from "../api";
-import TaskHeader from "@/pages/batch-link-up/TaskHeader";
-import BasicInfoSection from "@/pages/batch-link-up/BasicInfoSection";
-import { streamingSeatunnelJobInstanceApi } from "@/pages/batch-link-up/api";
-
 
 interface TaskDetailPanelProps {
   instanceItem: any;
@@ -29,7 +25,9 @@ const TaskDetailPanel: React.FC<TaskDetailPanelProps> = ({ instanceItem }) => {
     try {
       setLogLoading(true);
 
-      const res = await streamingSeatunnelJobInstanceApi.getLog(instanceItem?.id);
+      const res = await streamingSeatunnelJobInstanceApi.getLog(
+        instanceItem?.id
+      );
 
       setLogContent(
         res?.data ||

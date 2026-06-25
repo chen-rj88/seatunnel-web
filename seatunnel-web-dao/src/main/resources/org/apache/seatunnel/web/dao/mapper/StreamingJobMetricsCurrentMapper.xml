@@ -7,7 +7,7 @@
 
     <insert id="upsert"
             parameterType="org.apache.seatunnel.web.dao.entity.StreamingJobMetricsCurrent">
-        INSERT INTO t_seatunnel_streaming_job_metrics_current (
+        INSERT INTO t_seatunnel_web_streaming_job_metrics_current (
         job_instance_id,
         job_definition_id,
         engine_job_id,

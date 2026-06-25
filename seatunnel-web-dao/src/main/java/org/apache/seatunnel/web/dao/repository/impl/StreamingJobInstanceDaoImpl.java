@@ -8,6 +8,7 @@ import jakarta.annotation.Resource;
 import lombok.NonNull;
 import org.apache.seatunnel.web.common.enums.JobStatus;
 import org.apache.seatunnel.web.common.utils.ConvertUtil;
+import org.apache.seatunnel.web.common.utils.JobStatusHelper;
 import org.apache.seatunnel.web.dao.entity.StreamingJobInstance;
 import org.apache.seatunnel.web.dao.mapper.StreamingJobInstanceMapper;
 import org.apache.seatunnel.web.dao.repository.BaseDao;
@@ -40,6 +41,43 @@ public class StreamingJobInstanceDaoImpl
 
         Page<JobInstanceVO> page = new Page<>(pageNo, pageSize);
         return streamingJobInstanceMapper.pageWithDefinition(page, dto);
+    }
+
+    @Override
+    public int failRunningInstancesByClientId(Long clientId, String errorMessage) {
+        if (clientId == null || clientId <= 0) {
+            return 0;
+        }
+
+        Date now = new Date();
+
+        LambdaUpdateWrapper<StreamingJobInstance> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(StreamingJobInstance::getClientId, clientId)
+                .in(StreamingJobInstance::getJobStatus, JobStatusHelper.runningLikeStatuses())
+                .set(StreamingJobInstance::getJobStatus, JobStatus.FAILED)
+                .set(StreamingJobInstance::getErrorMessage, truncate(errorMessage, 2000))
+                .set(StreamingJobInstance::getEndTime, now)
+                .set(StreamingJobInstance::getUpdateTime, now);
+
+        return streamingJobInstanceMapper.update(null, wrapper);
+    }
+
+    @Override
+    public List<StreamingJobInstance> listRunningLikeInstances() {
+        LambdaQueryWrapper<StreamingJobInstance> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(StreamingJobInstance::getJobStatus,
+                JobStatus.INITIALIZING,
+                JobStatus.CREATED,
+                JobStatus.PENDING,
+                JobStatus.SCHEDULED,
+                JobStatus.RUNNING,
+                JobStatus.FAILING,
+                JobStatus.DOING_SAVEPOINT,
+                JobStatus.CANCELING)
+                .orderByDesc(StreamingJobInstance::getCreateTime);
+
+        List<StreamingJobInstance> records = streamingJobInstanceMapper.selectList(wrapper);
+        return records == null ? Collections.emptyList() : records;
     }
 
     @Override

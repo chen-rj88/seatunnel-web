@@ -44,7 +44,7 @@ export const generateDataSourceOptions = (): DataSourceType[] => [
     label: (
       <div style={{ display: "flex", alignItems: "center" }}>
         <PostgreSQL />
-        <span style={{ marginLeft: 8 }}>PGSQL</span>
+        <span style={{ marginLeft: 8 }}>PostGreSQL</span>
       </div>
     ),
   },

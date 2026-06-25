@@ -1,16 +1,29 @@
+import {
+  Alert,
+  Col,
+  Form,
+  Input,
+  InputNumber,
+  Radio,
+  Row,
+  Select,
+  Switch,
+} from "antd";
 import React from "react";
-import { Col, Form, InputNumber, Row, Select, Switch } from "antd";
+
 import {
   DATA_SAVE_MODE_OPTIONS,
   FIELD_IDE_OPTIONS,
   SCHEMA_SAVE_MODE_OPTIONS,
+  validateServerIdRange,
 } from "../config";
 
 const MultiWorkflowParamConfig: React.FC = () => {
   return (
     <div className="mt-6 rounded-2xl bg-white" style={{ marginBottom: 40 }}>
-      <div className="mb-5 text-base font-semibold text-slate-800">参数设置</div>
-
+      <div className="mb-5 text-base font-semibold text-slate-800">
+        参数设置
+      </div>
       <Row gutter={24}>
         <Col span={12}>
           <Form.Item
@@ -28,6 +41,29 @@ const MultiWorkflowParamConfig: React.FC = () => {
           >
             <InputNumber min={1} style={{ width: "100%" }} placeholder="8096" />
           </Form.Item>
+          <Form.Item
+            label="server-id"
+            name="serverId"
+            extra="支持单个 ID 或连续区间，例如 5400 或 5400-5408；同一个 MySQL 集群内必须唯一。"
+            rules={[
+              {
+                validator: async (_, value) => {
+                  if (!value) {
+                    return Promise.resolve();
+                  }
+
+                  const result = validateServerIdRange(value);
+                  if (!result.valid) {
+                    return Promise.reject(new Error(result.message));
+                  }
+
+                  return Promise.resolve();
+                },
+              },
+            ]}
+          >
+            <Input placeholder="例如：5400 或 5400-5408" allowClear />
+          </Form.Item>
         </Col>
 
         <Col span={12}>
@@ -38,7 +74,10 @@ const MultiWorkflowParamConfig: React.FC = () => {
                 name="schemaSaveMode"
                 rules={[{ required: true, message: "请选择 Schema 保存模式" }]}
               >
-                <Select placeholder="请选择" options={SCHEMA_SAVE_MODE_OPTIONS} />
+                <Select
+                  placeholder="请选择"
+                  options={SCHEMA_SAVE_MODE_OPTIONS}
+                />
               </Form.Item>
             </Col>
 
@@ -53,7 +92,11 @@ const MultiWorkflowParamConfig: React.FC = () => {
             </Col>
 
             <Col span={12}>
-              <Form.Item label="启用 Upsert" name="enableUpsert" valuePropName="checked">
+              <Form.Item
+                label="启用 Upsert"
+                name="enableUpsert"
+                valuePropName="checked"
+              >
                 <Switch />
               </Form.Item>
             </Col>

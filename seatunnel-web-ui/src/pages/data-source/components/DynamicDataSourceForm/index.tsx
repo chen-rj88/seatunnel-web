@@ -345,9 +345,7 @@ const DynamicDataSourceForm: React.FC<DynamicDataSourceFormProps> = ({
         return;
       }
 
-      message.error(resp?.msg || resp?.message || "插件安装失败");
     } catch (e: any) {
-      message.error(e?.message || "插件安装失败");
     } finally {
       setInstalling(false);
     }

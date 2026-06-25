@@ -1,54 +1,168 @@
-
-
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/901d765c-cbd7-4f39-ae3a-de6716ae09f2" width="100%" alt="Nest Logo" /></a>
+  <img src="https://github.com/user-attachments/assets/901d765c-cbd7-4f39-ae3a-de6716ae09f2" width="100%" alt="SeaTunnel Web Banner" />
 </p>
 
 <p align="center">
-<a href="http://111.230.213.87:8000" target="_blank">Live Demo</a>｜
-<a href="https://doc.seatunnel-web.com/">中文文档</a>
+<a href="http://111.230.213.87:8000" target="_blank">在线体验</a>｜
+<a href="https://doc.seatunnel-web.com/">项目文档</a>｜
+<a href="http://111.230.213.87:9001/">项目主页</a>
 </p>
 
 ## SeaTunnel Web
 
-**SeaTunnel Web** 是一个面向 **Apache SeaTunnel** 的现代化 Web 管理平台，用于简化数据集成任务的创建、配置和运行管理。
+**SeaTunnel Web** 是一款面向 **Apache SeaTunnel** 的现代化第三方 Web 控制台，致力于让数据同步任务的创建、配置、运行和运维变得更加简单、直观、可视化。
 
-该平台通过 **DAG 可视化编排** 的方式构建数据流水线，支持连接器配置、任务管理以及运行监控，使数据工程师可以更加高效地管理 **批处理与流处理的数据集成任务**，而无需手动编写复杂的配置文件。
+在使用 Apache SeaTunnel 的过程中，用户通常需要手动编写和维护较复杂的任务配置文件。对于刚接触 SeaTunnel 的用户，或者希望在团队内部快速落地数据同步平台的场景来说，这会带来一定的使用门槛。
 
-SeaTunnel Web 的目标是提升 Apache SeaTunnel 的易用性和开发效率，为数据管道开发与任务运维提供统一的平台。
+SeaTunnel Web 希望解决的正是这个问题：
+通过可视化页面，帮助用户更方便地管理数据源、编排同步流程、生成任务配置、提交运行任务、查看执行日志和监控运行指标。
 
-### 核心功能
+你可以把它理解为一个围绕 Apache SeaTunnel 构建的 **数据同步与集成控制台**。它既支持离线批同步任务，也支持实时流式同步任务，适合用于企业内部数据同步、数据集成、数据迁移、实时入湖、数据平台建设等场景。
 
-- **可视化 Pipeline 构建**  
-  通过 DAG 图形界面设计数据集成流程。
+> 项目的目标很简单：让 Apache SeaTunnel 在真实业务场景中更容易使用、更容易管理、更容易落地。
 
-- **连接器配置管理**  
-  支持配置 SeaTunnel 的 Source、Transform 和 Sink 连接器。
+## ✨ 项目亮点
 
-- **任务管理**  
-  在统一的 Web 界面中创建、编辑和运行 SeaTunnel 作业。
+* **可视化 DAG 任务编排**
+  通过拖拽式工作流画布构建数据同步链路，降低手写配置的复杂度。
 
-- **批流一体支持**  
-  同时支持批处理和流处理的数据集成任务。
+* **支持离线与实时同步**
+  同时支持 Batch 批同步任务和 Streaming 实时同步任务，覆盖更多数据集成场景。
 
-- **任务运行监控**  
-  实时查看任务运行状态和历史执行记录。
+* **统一数据源管理**
+  支持 MySQL、PostgreSQL、Oracle、MySQL CDC 等常见数据源连接管理，方便复用和维护。
 
-- **自动生成配置**  
-  通过可视化流程自动生成 SeaTunnel 作业配置。
+* **任务创建与运行管理**
+  支持任务创建、编辑、提交、停止、运行记录查看等完整任务生命周期管理。
 
-SeaTunnel Web 致力于让 Apache SeaTunnel 在生产环境中更加易用、可维护，并提升数据工程团队的开发效率。
+* **自动生成 SeaTunnel 配置**
+  根据页面中的可视化配置自动生成 SeaTunnel Job Config，减少手写 HOCON 配置的成本。
 
-## 🔥 加入社区群
+* **运行日志与历史记录**
+  支持查看任务运行日志、历史实例、执行状态，方便问题排查和任务追踪。
 
-如果你想第一时间体验 SeaTunnel Web 适配版，或者想与我们一起从 0 到 1 建设生态， 欢迎加入 SeaTunnel Web 早期共建群。
+* **内置运行指标监控**
+  无需依赖 Prometheus，也可以在平台内查看读写条数、QPS、任务状态等核心运行指标。
 
-<img width="200" height="300" alt="image" src="https://github.com/user-attachments/assets/3feda231-2b7d-4b2b-bb3b-817c315f4a34" />
+* **更友好的运维体验**
+  面向实际生产使用场景，提供任务实例、运行状态、日志、指标等一体化视图，帮助用户快速定位问题。
 
-## Github地址
+## 🚀 为什么要做 SeaTunnel Web？
 
-- https://github.com/weifuwan/seatunnel-web
+Apache SeaTunnel 是一个非常强大的数据集成引擎，具备丰富的 Connector 能力和优秀的任务执行能力。
 
-## 参与建设
+但在实际使用过程中，很多用户仍然会遇到一些问题：
 
-欢迎任何形式的代码贡献。
+* 不熟悉 SeaTunnel 配置文件的编写方式；
+* 多数据源、多任务场景下配置维护成本较高；
+* 缺少一个统一的 Web 页面来管理任务；
+* 任务运行后，日志、状态、指标查看不够集中；
+* 对团队协作、任务运维、问题排查不够友好；
+* 批任务和实时任务希望在同一个平台中统一管理。
+
+SeaTunnel Web 的定位，就是在 Apache SeaTunnel 强大的引擎能力之上，提供一个更加易用、直观、贴近生产场景的 Web 管理平台。
+
+它并不是为了替代 SeaTunnel，而是希望让 SeaTunnel 的使用体验更加完整，让更多用户可以更低成本地把 SeaTunnel 应用到实际业务中。
+
+## 🧩 核心能力
+
+SeaTunnel Web 当前主要围绕以下能力建设：
+
+* 数据源连接管理；
+* 可视化任务编排；
+* 字段映射与数据转换配置；
+* SeaTunnel 任务配置自动生成；
+* Batch 离线同步任务管理；
+* Streaming 实时同步任务管理；
+* 任务提交、停止与运行状态查看；
+* 任务实例与历史记录管理；
+* 实时日志查看；
+* 运行指标展示；
+* MySQL CDC 等实时同步场景支持；
+* 面向生产使用的任务运维能力。
+
+## 🛠️ 适用场景
+
+SeaTunnel Web 适合以下使用场景：
+
+* 企业内部数据同步平台建设；
+* 数据库之间的数据迁移与同步；
+* 离线批量数据同步任务管理；
+* MySQL CDC 实时数据同步；
+* 数据入湖、入仓、入数仓场景；
+* 多数据源、多任务的统一管理；
+* 希望使用 Apache SeaTunnel，但不想完全依赖手写配置文件的团队；
+* 希望快速搭建一个轻量级数据集成平台的开发者或团队。
+
+## 📚 项目文档
+
+详细的安装说明、使用指南、功能介绍和最佳实践，请访问：
+
+👉 [SeaTunnel Web Documentation](https://doc.seatunnel-web.com/)
+
+文档中会持续补充：
+
+* 快速开始；
+* 本地部署；
+* 数据源配置；
+* 批同步任务配置；
+* 实时同步任务配置；
+* SeaTunnel 引擎对接说明；
+* 常见问题排查；
+* 最佳实践文章。
+
+## 🖥️ 在线体验
+
+你可以通过下面的地址在线体验 SeaTunnel Web：
+
+👉 [Live Demo](http://111.230.213.87:8000)
+
+体验环境主要用于功能预览和界面体验，数据与服务可能会不定期重置或调整。
+
+## 🔥 加入交流群
+
+如果你想第一时间体验 SeaTunnel Web 的适配版本，或者希望一起参与项目从 **0 到 1** 的建设，非常欢迎加入 **SeaTunnel Web 早期共创交流群**。
+
+在这里，贡献并不只代表写代码。
+
+你可以：
+
+* 提出产品建议；
+* 反馈使用问题；
+* 分享使用场景；
+* 参与文档完善；
+* 帮助测试功能；
+* 分享 SeaTunnel Web 给更多人；
+* 一起讨论数据同步和数据集成相关问题。
+
+每一个真实的反馈，都会帮助 SeaTunnel Web 变得更好。
+
+<img width="200" height="320" alt="SeaTunnel Web WeChat Group" src="https://github.com/user-attachments/assets/9389015b-b497-4a20-ba87-e3c570299f16" />
+
+## 🤝 欢迎参与贡献
+
+SeaTunnel Web 仍在持续完善中，非常欢迎感兴趣的朋友参与进来。
+
+你可以通过以下方式参与项目：
+
+* 提交 Issue 反馈问题；
+* 提交 Pull Request 改进功能；
+* 完善项目文档；
+* 补充使用案例；
+* 分享部署经验；
+* 提供真实业务场景建议；
+* 一起完善 SeaTunnel Web 生态。
+
+无论是代码、文档、测试、设计建议，还是简单的一条反馈，都是对项目非常重要的帮助。
+
+## 📌 项目说明
+
+SeaTunnel Web 是一个独立维护的第三方 Web 项目，目标是提升 Apache SeaTunnel 在实际数据同步场景中的易用性和可运维性。
+
+Apache SeaTunnel 是 Apache 软件基金会旗下项目。SeaTunnel Web 并非 Apache 官方项目，而是围绕 Apache SeaTunnel 生态构建的社区化增强工具。
+
+## ⭐ Star
+
+如果你觉得 SeaTunnel Web 对你有帮助，欢迎给项目点一个 Star。
+
+你的支持会让这个项目被更多人看到，也会鼓励项目继续迭代和完善。

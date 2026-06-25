@@ -38,7 +38,7 @@ const DATA_SOURCE_CONFIG: Record<
 > = {
   MYSQL: { icon: MysqlIcon, displayName: 'MySQL' },
   ORACLE: { icon: OracleIcon, displayName: 'ORACLE' },
-  POSTGRE_SQL: { icon: PostgreSQL, displayName: 'PGSQL' }
+  POSTGRE_SQL: { icon: PostgreSQL, displayName: 'PostgreSQL' }
 };
 
 // 默认支持的数据源

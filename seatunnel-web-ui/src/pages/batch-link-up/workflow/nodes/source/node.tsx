@@ -12,6 +12,7 @@ interface SourceNodeData {
 const SourceNode: FC<NodeProps<SourceNodeData>> = ({ data, selected }) => {
   const [hovered, setHovered] = useState(false);
 
+
   const displayTitle = useMemo(() => {
     return data?.title || "输入端";
   }, [data?.title]);

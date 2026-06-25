@@ -10,7 +10,7 @@ import java.util.Date;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-@TableName("t_seatunnel_client")
+@TableName("t_seatunnel_web_client")
 public class SeaTunnelClient {
 
     private Long id;

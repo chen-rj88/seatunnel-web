@@ -1,18 +1,22 @@
 package org.apache.seatunnel.web.core.job.handler.single;
 
-import org.apache.seatunnel.web.core.job.model.JobDefinitionAnalysisResult;
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisContext;
+import org.apache.seatunnel.plugin.datasource.api.analysis.DatasourceAnalysisRole;
+import org.apache.seatunnel.plugin.datasource.api.analysis.JobDefinitionAnalyzer;
+import org.apache.seatunnel.plugin.datasource.api.jdbc.DataSourceProcessor;
+import org.apache.seatunnel.plugin.datasource.api.utils.DataSourceUtils;
+import org.apache.seatunnel.web.common.enums.JobDefinitionMode;
+import org.apache.seatunnel.web.common.modal.JobDefinitionAnalysisResult;
+import org.apache.seatunnel.web.spi.enums.DbType;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Component
 public class GuideSingleWorkflowAnalyzer {
-
-    private static final Pattern FROM_TABLE_PATTERN = Pattern.compile(
-            "(?i)\\bfrom\\s+([`\"]?[\\w.]+[`\"]?)"
-    );
 
     public JobDefinitionAnalysisResult analyze(Object workflowObj) {
         Map<String, Object> workflow = WorkflowNodeHelper.safeMap(workflowObj);
@@ -20,172 +24,115 @@ public class GuideSingleWorkflowAnalyzer {
         Map<String, Object> sourceNode = WorkflowNodeHelper.findFirstNodeByType(workflow, "source");
         Map<String, Object> sinkNode = WorkflowNodeHelper.findFirstNodeByType(workflow, "sink");
 
+        JobDefinitionAnalysisResult sourceAnalysis = analyzeNode(
+                DatasourceAnalysisRole.SOURCE,
+                sourceNode,
+                workflowObj
+        );
+
+        JobDefinitionAnalysisResult sinkAnalysis = analyzeNode(
+                DatasourceAnalysisRole.SINK,
+                sinkNode,
+                workflowObj
+        );
+
         return JobDefinitionAnalysisResult.builder()
-                .sourceType(extractNodeDbType(sourceNode))
-                .sinkType(extractNodeDbType(sinkNode))
-                .sourceDatasourceId(extractDatasourceId(sourceNode))
-                .sinkDatasourceId(extractDatasourceId(sinkNode))
-                .sourceTable(extractSourceTable(sourceNode))
-                .sinkTable(extractSinkTable(sinkNode))
+                .sourceType(sourceAnalysis.getSourceType())
+                .sinkType(sinkAnalysis.getSinkType())
+                .sourceDatasourceId(sourceAnalysis.getSourceDatasourceId())
+                .sinkDatasourceId(sinkAnalysis.getSinkDatasourceId())
+                .sourceTable(sourceAnalysis.getSourceTable())
+                .sinkTable(sinkAnalysis.getSinkTable())
                 .build();
     }
 
-    private String extractNodeDbType(Map<String, Object> node) {
-        if (node == null || node.isEmpty()) {
+    private JobDefinitionAnalysisResult analyzeNode(DatasourceAnalysisRole role,
+                                                    Map<String, Object> node,
+                                                    Object workflowObj) {
+        Map<String, Object> data = WorkflowNodeHelper.safeMap(node == null ? null : node.get("data"));
+        Map<String, Object> config = WorkflowNodeHelper.safeMap(data.get("config"));
+
+        String dbTypeText = firstNonBlank(
+                getString(data, "dbType"),
+                getString(config, "dbType")
+        );
+
+        if (StringUtils.isBlank(dbTypeText)) {
+            return JobDefinitionAnalysisResult.builder().build();
+        }
+
+        DbType dbType;
+        try {
+            dbType = DbType.valueOf(dbTypeText.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return JobDefinitionAnalysisResult.builder().build();
+        }
+
+        DataSourceProcessor processor = DataSourceUtils.getDatasourceProcessor(dbType);
+        if (processor == null || processor.getJobDefinitionAnalyzer() == null) {
+            return JobDefinitionAnalysisResult.builder().build();
+        }
+
+        JobDefinitionAnalyzer analyzer = processor.getJobDefinitionAnalyzer();
+
+        Config pluginConfig = ConfigFactory.parseMap(config);
+
+        DatasourceAnalysisContext context = DatasourceAnalysisContext.builder()
+                .mode(JobDefinitionMode.GUIDE_SINGLE)
+                .role(role)
+                .dbType(dbType)
+                .pluginName(firstNonBlank(
+                        getString(data, "pluginName"),
+                        getString(config, "pluginName"),
+                        getString(data, "connectorType"),
+                        getString(config, "connectorType")
+                ))
+                .datasourceId(parseLong(firstNonBlank(
+                        getString(config, "dataSourceId"),
+                        getString(config, "datasourceId"),
+                        getString(data, "dataSourceId"),
+                        getString(data, "datasourceId")
+                )))
+                .pluginConfig(pluginConfig)
+                .workflowNode(node)
+                .rawContent(workflowObj)
+                .build();
+
+        return analyzer.analyze(context);
+    }
+
+    private String getString(Map<String, Object> map, String key) {
+        if (map == null || map.isEmpty() || key == null) {
             return "";
         }
 
-        Map<String, Object> data = WorkflowNodeHelper.safeMap(node.get("data"));
-        Map<String, Object> config = WorkflowNodeHelper.safeMap(data.get("config"));
-
-        String dbType = WorkflowNodeHelper.getString(data, "dbType");
-        if (!dbType.isEmpty()) {
-            return dbType;
-        }
-
-        return WorkflowNodeHelper.getString(config, "dbType");
+        Object value = map.get(key);
+        return value == null ? "" : StringUtils.trimToEmpty(String.valueOf(value));
     }
 
-    private Long extractDatasourceId(Map<String, Object> node) {
-        if (node == null || node.isEmpty()) {
-            return null;
-        }
-
-        Map<String, Object> data = WorkflowNodeHelper.safeMap(node.get("data"));
-        Map<String, Object> config = WorkflowNodeHelper.safeMap(data.get("config"));
-
-        Object rawDatasourceId = firstNonNull(
-                config.get("dataSourceId")
-        );
-
-        return parseLong(rawDatasourceId);
-    }
-
-    private Object firstNonNull(Object... values) {
+    private String firstNonBlank(String... values) {
         if (values == null) {
-            return null;
+            return "";
         }
 
-        for (Object value : values) {
-            if (value != null) {
-                return value;
+        for (String value : values) {
+            if (StringUtils.isNotBlank(value)) {
+                return value.trim();
             }
-        }
-
-        return null;
-    }
-
-    private Long parseLong(Object value) {
-        if (value == null) {
-            return null;
-        }
-
-        if (value instanceof Number) {
-            return ((Number) value).longValue();
-        }
-
-        String text = WorkflowNodeHelper.safeTrim(String.valueOf(value));
-        if (text.isEmpty()) {
-            return null;
-        }
-
-        try {
-            return Long.parseLong(text);
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
-    }
-
-    private String extractSourceTable(Map<String, Object> sourceNode) {
-        if (sourceNode == null || sourceNode.isEmpty()) {
-            return "";
-        }
-
-        Map<String, Object> data = WorkflowNodeHelper.safeMap(sourceNode.get("data"));
-        Map<String, Object> config = WorkflowNodeHelper.safeMap(data.get("config"));
-
-        String sourceTable = WorkflowNodeHelper.firstNonBlank(
-                WorkflowNodeHelper.getString(data, "sourceTable"),
-                WorkflowNodeHelper.getString(config, "sourceTable"),
-                WorkflowNodeHelper.getString(data, "table"),
-                WorkflowNodeHelper.getString(config, "table"),
-                WorkflowNodeHelper.getString(data, "sourceTableName"),
-                WorkflowNodeHelper.getString(config, "sourceTableName")
-        );
-        if (!sourceTable.isEmpty()) {
-            return sourceTable;
-        }
-
-        String sql = WorkflowNodeHelper.firstNonBlank(
-                WorkflowNodeHelper.getString(config, "sql"),
-                WorkflowNodeHelper.getString(data, "sql")
-        );
-        return parseTableFromSql(sql);
-    }
-
-    private String extractSinkTable(Map<String, Object> sinkNode) {
-        if (sinkNode == null || sinkNode.isEmpty()) {
-            return "";
-        }
-
-        Map<String, Object> data = WorkflowNodeHelper.safeMap(sinkNode.get("data"));
-        Map<String, Object> config = WorkflowNodeHelper.safeMap(data.get("config"));
-
-        String sinkTable = WorkflowNodeHelper.firstNonBlank(
-                WorkflowNodeHelper.getString(data, "sinkTableName"),
-                WorkflowNodeHelper.getString(config, "sinkTableName"),
-                WorkflowNodeHelper.getString(data, "targetTableName"),
-                WorkflowNodeHelper.getString(config, "targetTableName"),
-                WorkflowNodeHelper.getString(data, "table"),
-                WorkflowNodeHelper.getString(config, "table"),
-                WorkflowNodeHelper.getString(data, "targetTable"),
-                WorkflowNodeHelper.getString(config, "targetTable")
-        );
-        if (!sinkTable.isEmpty()) {
-            return sinkTable;
-        }
-
-        String sinkSql = WorkflowNodeHelper.firstNonBlank(
-                WorkflowNodeHelper.getString(data, "sinkSql"),
-                WorkflowNodeHelper.getString(config, "sinkSql"),
-                WorkflowNodeHelper.getString(data, "sql"),
-                WorkflowNodeHelper.getString(config, "sql")
-        );
-        return parseTableFromSql(sinkSql);
-    }
-
-    private String parseTableFromSql(String sql) {
-        if (sql == null || sql.trim().isEmpty()) {
-            return "";
-        }
-
-        try {
-            String normalizedSql = sql
-                    .replaceAll("[\\r\\n\\t]+", " ")
-                    .replaceAll("\\s+", " ")
-                    .trim();
-
-            Matcher matcher = FROM_TABLE_PATTERN.matcher(normalizedSql);
-            if (matcher.find()) {
-                return cleanIdentifier(matcher.group(1));
-            }
-        } catch (Exception ignored) {
         }
 
         return "";
     }
 
-    private String cleanIdentifier(String value) {
-        String result = WorkflowNodeHelper.safeTrim(value);
-        if (result.isEmpty()) {
-            return "";
+    private Long parseLong(String value) {
+        if (StringUtils.isBlank(value)) {
+            return null;
         }
 
-        if ((result.startsWith("`") && result.endsWith("`"))
-                || (result.startsWith("\"") && result.endsWith("\""))) {
-            result = result.substring(1, result.length() - 1);
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException ignored) {
+            return null;
         }
-
-        return result.trim();
     }
 }
