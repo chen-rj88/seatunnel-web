@@ -187,7 +187,12 @@ const DetailPage = () => {
 
         <div
           ref={scrollRef}
-          style={{ height: "calc(100vh - 260px)", overflow: "auto" }}
+          style={{
+            boxSizing: "border-box",
+            height: "calc(100vh - 260px)",
+            overflow: "auto",
+            paddingBottom: 96,
+          }}
         >
           <Form form={form} layout="vertical">
             <div className="overflow-hidden rounded-[24px] border border-[#EAECF0] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
