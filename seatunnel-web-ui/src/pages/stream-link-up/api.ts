@@ -240,6 +240,20 @@ export const seatunnelStreamingJobExecuteApi = {
       `${streamingExecuteApiPrefix}/pause?jobInstanceId=${jobInstanceId}`,
     );
   },
+
+  stopWithSavepoint: (jobInstanceId: any) => {
+    return HttpUtils.post(
+      `${streamingExecuteApiPrefix}/stop-with-savepoint?jobInstanceId=${jobInstanceId}`,
+      {},
+    );
+  },
+
+  resumeFromSavepoint: (sourceJobInstanceId: any) => {
+    return HttpUtils.post(
+      `${streamingExecuteApiPrefix}/resume-from-savepoint?sourceJobInstanceId=${sourceJobInstanceId}`,
+      {},
+    );
+  },
 };
 
 const instanceApiPrefix = '/api/v1/job/batch-instance';

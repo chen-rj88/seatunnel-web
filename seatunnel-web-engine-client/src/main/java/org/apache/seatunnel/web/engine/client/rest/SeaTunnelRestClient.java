@@ -408,6 +408,15 @@ public class SeaTunnelRestClient {
     }
 
     public Map submitJobUpload(Long clientId, byte[] fileBytes, String filename) {
+        return submitJobUpload(clientId, fileBytes, filename, null, null, null);
+    }
+
+    public Map submitJobUpload(Long clientId,
+                               byte[] fileBytes,
+                               String filename,
+                               String jobId,
+                               String jobName,
+                               Boolean isStartWithSavePoint) {
         try {
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
 
@@ -425,8 +434,13 @@ public class SeaTunnelRestClient {
                     multipartHeaders(clientId)
             );
 
+            UriComponentsBuilder builder =
+                    UriComponentsBuilder.fromHttpUrl(url(clientId, "/submit-job/upload"));
+
+            appendSubmitJobParams(builder, jobId, jobName, isStartWithSavePoint);
+
             ResponseEntity<Map> response = restTemplate.exchange(
-                    url(clientId, "/submit-job/upload"),
+                    builder.build(true).toUriString(),
                     HttpMethod.POST,
                     request,
                     Map.class

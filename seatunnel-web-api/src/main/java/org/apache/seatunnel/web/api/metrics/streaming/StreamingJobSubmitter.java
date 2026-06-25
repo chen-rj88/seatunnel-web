@@ -41,7 +41,16 @@ public class StreamingJobSubmitter {
     }
 
     public void submit(JobInstanceVO instance) {
+        submit(instance, StreamingJobSubmitOptions.normal());
+    }
+
+    public void submitFromSavepoint(JobInstanceVO instance, Long restoreEngineJobId) {
+        submit(instance, StreamingJobSubmitOptions.restoreFromSavepoint(restoreEngineJobId));
+    }
+
+    public void submit(JobInstanceVO instance, StreamingJobSubmitOptions options) {
         validate(instance);
+        validateSubmitOptions(options);
 
         Long instanceId = instance.getId();
         Long jobDefinitionId = instance.getJobDefinitionId();
@@ -55,6 +64,8 @@ public class StreamingJobSubmitter {
         jobLogger.info("Streaming instanceId: " + instanceId);
         jobLogger.info("Streaming definitionId: " + jobDefinitionId);
         jobLogger.info("Client id: " + clientId);
+        jobLogger.info("Start with savepoint: " + options.isStartWithSavepoint());
+        jobLogger.info("Restore engine job id: " + options.getRestoreEngineJobId());
 
         String configFile = null;
         Long engineId = null;
@@ -66,14 +77,23 @@ public class StreamingJobSubmitter {
             jobLogger.info("Streaming config file written to: " + configFile);
 
             jobLogger.info("Submitting streaming job via REST API...");
-            log.info("Submitting streaming job to Zeta, instanceId={}, clientId={}", instanceId, clientId);
+            log.info(
+                    "Submitting streaming job to Zeta, instanceId={}, clientId={}, startWithSavepoint={}, restoreEngineJobId={}",
+                    instanceId,
+                    clientId,
+                    options.isStartWithSavepoint(),
+                    options.getRestoreEngineJobId()
+            );
 
             String filename = "streaming-job-" + instanceId + ".conf";
 
             Map<?, ?> resp = restClient.submitJobUpload(
                     clientId,
                     safeConfig(hoconConfig).getBytes(StandardCharsets.UTF_8),
-                    filename
+                    filename,
+                    options.getEngineJobIdParam(),
+                    null,
+                    options.isStartWithSavepoint()
             );
 
             engineId = extractJobId(resp);
@@ -102,29 +122,38 @@ public class StreamingJobSubmitter {
     }
 
     public void pause(JobInstanceVO instance) {
-        if (instance == null || instance.getId() == null) {
-            throw new ServiceException(Status.REQUEST_PARAMS_NOT_VALID_ERROR, "jobInstance");
-        }
+        stop(instance, false);
+    }
 
-        if (instance.getClientId() == null || instance.getClientId() <= 0) {
-            throw new ServiceException(Status.REQUEST_PARAMS_NOT_VALID_ERROR, "clientId");
-        }
+    public void stopWithSavepoint(JobInstanceVO instance) {
+        stop(instance, true);
+    }
 
-        if (instance.getEngineJobId() == null || instance.getEngineJobId() <= 0) {
-            throw new ServiceException(Status.REQUEST_PARAMS_NOT_VALID_ERROR, "engineJobId");
-        }
+    public void stop(JobInstanceVO instance, boolean stopWithSavepoint) {
+        validateStopInstance(instance);
 
         Long instanceId = instance.getId();
         Long clientId = instance.getClientId();
         Long engineJobId = instance.getEngineJobId();
 
-        log.info("Stopping streaming SeaTunnel job: instanceId={}, clientId={}, engineJobId={}",
-                instanceId, clientId, engineJobId);
+        log.info(
+                "Stopping streaming SeaTunnel job: instanceId={}, clientId={}, engineJobId={}, stopWithSavepoint={}",
+                instanceId,
+                clientId,
+                engineJobId,
+                stopWithSavepoint
+        );
 
-        Map<?, ?> resp = restClient.stopJob(clientId, engineJobId, false);
+        Map<?, ?> resp = restClient.stopJob(clientId, engineJobId, stopWithSavepoint);
 
-        log.info("Stop streaming SeaTunnel job response: instanceId={}, clientId={}, engineJobId={}, resp={}",
-                instanceId, clientId, engineJobId, resp);
+        log.info(
+                "Stop streaming SeaTunnel job response: instanceId={}, clientId={}, engineJobId={}, stopWithSavepoint={}, resp={}",
+                instanceId,
+                clientId,
+                engineJobId,
+                stopWithSavepoint,
+                resp
+        );
     }
 
     private void registerPostSubmitWatchers(JobRuntimeContext ctx,
@@ -231,7 +260,7 @@ public class StreamingJobSubmitter {
             throw new IllegalArgumentException("Streaming job instance id must not be null");
         }
 
-        if (instance.getClientId() == null) {
+        if (instance.getClientId() == null || instance.getClientId() <= 0) {
             throw new IllegalArgumentException("Streaming job client id must not be null");
         }
 
@@ -241,6 +270,31 @@ public class StreamingJobSubmitter {
 
         if (StringUtils.isBlank(instance.getRuntimeConfig())) {
             throw new IllegalArgumentException("Streaming job runtime config must not be blank");
+        }
+    }
+
+    private void validateSubmitOptions(StreamingJobSubmitOptions options) {
+        if (options == null) {
+            throw new IllegalArgumentException("Streaming submit options must not be null");
+        }
+
+        if (options.isStartWithSavepoint()
+                && (options.getRestoreEngineJobId() == null || options.getRestoreEngineJobId() <= 0)) {
+            throw new IllegalArgumentException("restoreEngineJobId must be positive when startWithSavepoint is true");
+        }
+    }
+
+    private void validateStopInstance(JobInstanceVO instance) {
+        if (instance == null || instance.getId() == null) {
+            throw new ServiceException(Status.REQUEST_PARAMS_NOT_VALID_ERROR, "jobInstance");
+        }
+
+        if (instance.getClientId() == null || instance.getClientId() <= 0) {
+            throw new ServiceException(Status.REQUEST_PARAMS_NOT_VALID_ERROR, "clientId");
+        }
+
+        if (instance.getEngineJobId() == null || instance.getEngineJobId() <= 0) {
+            throw new ServiceException(Status.REQUEST_PARAMS_NOT_VALID_ERROR, "engineJobId");
         }
     }
 
