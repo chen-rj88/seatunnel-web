@@ -5,8 +5,11 @@ import {
   DownOutlined,
   EditOutlined,
   EyeOutlined,
+  FileTextOutlined,
   PauseCircleOutlined,
   PlayCircleOutlined,
+  SaveOutlined,
+  SyncOutlined,
 } from "@ant-design/icons";
 import { Dropdown, Popconfirm, Space, message } from "antd";
 import React, { useState } from "react";
@@ -21,6 +24,7 @@ export interface StreamingJobDefinitionVO {
   jobVersion?: number;
   releaseState?: "ONLINE" | "OFFLINE" | string | number;
   lastJobStatus?: string;
+  lastErrorMessage?: string;
   instanceId?: string | number;
   sourceType?: string;
   sinkType?: string;
@@ -31,6 +35,8 @@ export interface StreamingJobDefinitionVO {
   createTime?: string;
   updateTime?: string;
   checkpointConfig?: string;
+  checkpointPath?: string;
+  savepointPath?: string;
 }
 
 interface RealtimeTaskActionColumnProps {
@@ -40,6 +46,8 @@ interface RealtimeTaskActionColumnProps {
   onEdit?: (record: StreamingJobDefinitionVO) => void;
   onRun?: (record: StreamingJobDefinitionVO) => Promise<void> | void;
   onStop?: (record: StreamingJobDefinitionVO) => Promise<void> | void;
+  onStopWithSavepoint?: (record: StreamingJobDefinitionVO) => Promise<void> | void;
+  onResumeFromSavepoint?: (record: StreamingJobDefinitionVO) => Promise<void> | void;
   onOnline?: (record: StreamingJobDefinitionVO) => Promise<void> | void;
   onOffline?: (record: StreamingJobDefinitionVO) => Promise<void> | void;
   onDelete?: (record: StreamingJobDefinitionVO) => Promise<void> | void;
@@ -65,12 +73,18 @@ const isReleaseOnline = (releaseState?: string | number) => {
   return releaseState === "ONLINE" || releaseState === 1;
 };
 
+const isRunningStatus = (status?: string) => {
+  return String(status || "").toUpperCase() === "RUNNING";
+};
+
 const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
   record,
   onDetail,
   onEdit,
   onRun,
   onStop,
+  onStopWithSavepoint,
+  onResumeFromSavepoint,
   onOnline,
   onOffline,
   onDelete,
@@ -86,10 +100,14 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
   const [offlineLoading, setOfflineLoading] = useState(false);
 
   const isOnline = isReleaseOnline(record.releaseState);
-  const isRunning = record.lastJobStatus === "RUNNING";
+  const isRunning = isRunningStatus(record.lastJobStatus);
+  const hasInstance = !!record.instanceId;
+  const hasSavepoint = !!record.savepointPath;
 
   const canRun = isOnline && !isRunning;
   const canOffline = isOnline && !isRunning;
+  const canStopWithSavepoint = isRunning && hasInstance;
+  const canResumeFromSavepoint = isOnline && !isRunning && hasInstance && hasSavepoint;
 
   const disableEditOrDelete = isOnline || isRunning;
 
@@ -253,6 +271,7 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
           onOpenChange={(open) => {
             if (!canOffline) {
               if (isRunning) {
+                message.warning("任务正在运行中，请先停止任务后再下线");
               }
 
               return;
@@ -284,12 +303,8 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
             onClick={(event) => {
               event.stopPropagation();
 
-              if (!canOffline) {
-                if (isRunning) {
-                  message.warning("任务正在运行中，请先停止任务后再下线");
-                }
-
-                return;
+              if (!canOffline && isRunning) {
+                message.warning("任务正在运行中，请先停止任务后再下线");
               }
             }}
           >
@@ -334,14 +349,39 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
               icon: <EyeOutlined />,
               label: "查看详情",
             },
+            // {
+            //   key: "log",
+            //   icon: <FileTextOutlined />,
+            //   label: "查看日志",
+            // },
+            // {
+            //   key: "checkpoint",
+            //   icon: <SaveOutlined />,
+            //   label: "检查点配置",
+            // },
+            {
+              type: "divider",
+            },
+            {
+              key: "stopWithSavepoint",
+              icon: <SaveOutlined />,
+              label: "停止并保存检查点",
+              disabled: !canStopWithSavepoint,
+            },
+            {
+              key: "resumeFromSavepoint",
+              icon: <SyncOutlined />,
+              label: "从检查点恢复",
+              disabled: !canResumeFromSavepoint,
+            },
+            {
+              type: "divider",
+            },
             {
               key: "edit",
               icon: <EditOutlined />,
               label: "编辑配置",
               disabled: disableEditOrDelete,
-            },
-            {
-              type: "divider",
             },
             {
               key: "delete",
@@ -351,11 +391,55 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
               disabled: disableEditOrDelete,
             },
           ],
-          onClick: (info) => {
+          onClick: async (info) => {
             info.domEvent.stopPropagation();
 
             if (info.key === "view") {
               onDetail?.(record);
+              return;
+            }
+
+            if (info.key === "log") {
+              onLog?.(record);
+              return;
+            }
+
+            if (info.key === "checkpoint") {
+              onCheckpoint?.(record);
+              return;
+            }
+
+            if (info.key === "stopWithSavepoint") {
+              if (!canStopWithSavepoint) {
+                message.warning("只有运行中的任务才能保存检查点停止");
+                return;
+              }
+
+              await onStopWithSavepoint?.(record);
+              return;
+            }
+
+            if (info.key === "resumeFromSavepoint") {
+              if (!canResumeFromSavepoint) {
+                if (!isOnline) {
+                  message.warning("请先上线任务，再执行检查点恢复");
+                  return;
+                }
+
+                if (isRunning) {
+                  message.warning("任务正在运行中，不能重复恢复");
+                  return;
+                }
+
+                if (!hasSavepoint) {
+                  message.warning("当前任务没有可恢复的检查点");
+                  return;
+                }
+
+                return;
+              }
+
+              await onResumeFromSavepoint?.(record);
               return;
             }
 
@@ -366,16 +450,6 @@ const RealtimeTaskActionColumn: React.FC<RealtimeTaskActionColumnProps> = ({
               }
 
               onEdit?.(record);
-              return;
-            }
-
-            if (info.key === "checkpoint") {
-              onCheckpoint?.(record);
-              return;
-            }
-
-            if (info.key === "log") {
-              onLog?.(record);
               return;
             }
 

@@ -47,6 +47,9 @@ interface StreamingJobDefinitionVO {
   sinkDatasourceId?: string | number;
   createTime?: string;
   updateTime?: string;
+  savepointPath?: string;
+  checkpointPath?: string;
+  lastErrorMessage?: string;
   checkpointConfig?: string;
 }
 
@@ -384,7 +387,7 @@ const RealtimeSyncPage: React.FC = () => {
   };
 
   const handleDetail = (record: StreamingJobDefinitionVO) => {
-    console.log("123")
+    console.log("123");
     refDetail.current?.onOpen(true, record, () => {});
   };
 
@@ -624,6 +627,115 @@ const RealtimeSyncPage: React.FC = () => {
     }
   };
 
+  const handleStopWithSavepoint = async (record: StreamingJobDefinitionVO) => {
+    if (!record?.instanceId) {
+      message.warning("当前任务没有运行实例");
+      return;
+    }
+
+    Modal.confirm({
+      title: "停止并保存检查点？",
+      centered: true,
+      content: (
+        <div className="leading-6">
+          该操作会先保存当前实时任务状态，然后停止运行实例。
+          <br />
+          后续可以基于该检查点继续恢复运行。
+        </div>
+      ),
+      okText: "确认保存并停止",
+      cancelText: "取消",
+      okButtonProps: {
+        danger: true,
+        size: "small",
+      },
+      cancelButtonProps: {
+        size: "small",
+      },
+      async onOk() {
+        try {
+          const res = await seatunnelStreamingJobExecuteApi.stopWithSavepoint(
+            record.instanceId
+          );
+
+          if (res?.code !== 0) {
+            message.error(res?.message || res?.msg || "停止并保存检查点失败");
+            return;
+          }
+
+          message.success("已停止任务，并保存检查点");
+          loadData();
+        } catch (error) {
+          message.error("停止并保存检查点失败");
+        }
+      },
+    });
+  };
+
+  const handleResumeFromSavepoint = async (
+    record: StreamingJobDefinitionVO
+  ) => {
+    if (!record?.instanceId) {
+      message.warning("当前任务没有可恢复的历史实例");
+      return;
+    }
+
+    const isOnline =
+      record.releaseState === "ONLINE" || record.releaseState === 1;
+
+    if (!isOnline) {
+      message.warning("请先上线任务，再从检查点恢复");
+      return;
+    }
+
+    if (record.lastJobStatus === "RUNNING") {
+      message.warning("任务正在运行中，不能重复恢复");
+      return;
+    }
+
+    if (!record.savepointPath) {
+      message.warning("当前任务没有可恢复的检查点，请先使用“停止并保存检查点”");
+      return;
+    }
+
+    Modal.confirm({
+      title: "从检查点恢复实时任务？",
+      centered: true,
+      content: (
+        <div className="leading-6">
+          系统会基于最近一次保存的检查点创建新的运行实例。
+          <br />
+          适用于 MySQL CDC、实时同步等需要断点续跑的任务。
+        </div>
+      ),
+      okText: "确认恢复",
+      cancelText: "取消",
+      okButtonProps: {
+        size: "small",
+      },
+      cancelButtonProps: {
+        size: "small",
+      },
+      async onOk() {
+        try {
+          const res = await seatunnelStreamingJobExecuteApi.resumeFromSavepoint(
+            record.instanceId
+          );
+
+          if (res?.code !== 0) {
+            message.error(res?.message || res?.msg || "从检查点恢复失败");
+            return;
+          }
+
+          message.success("已从检查点恢复实时任务");
+          loadData();
+        } catch (error) {
+          message.error("从检查点恢复失败");
+        }
+      },
+    });
+  };
+
   return (
     <>
       <div className="min-h-screen px-6 pb-24 pt-7 text-slate-950">
@@ -655,6 +767,8 @@ const RealtimeSyncPage: React.FC = () => {
             onDetail={handleDetail}
             onEdit={handleEdit}
             onRun={handleRun}
+            onStopWithSavepoint={handleStopWithSavepoint}
+            onResumeFromSavepoint={handleResumeFromSavepoint}
             onStop={handleStop}
             onOnline={handleOnline}
             onOffline={handleOffline}

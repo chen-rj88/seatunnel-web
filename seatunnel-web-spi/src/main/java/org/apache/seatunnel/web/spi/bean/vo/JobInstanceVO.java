@@ -15,6 +15,10 @@ public class JobInstanceVO {
 
     private Long clientId;
 
+    private String checkpointPath;
+
+    private String savepointPath;
+
     private String runMode;
 
     private String jobStatus;
